@@ -35,6 +35,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         JpegQuality = s0.JpegQuality;
         ExportSize = s0.ExportSize;
         UseHttps = s0.UseHttps;
+        LockOnExport = s0.LockOnExport;
         MoonLineEnabled = s0.MoonLineEnabled;
         Theme = s0.Theme;
         DefaultBrowseFolder = s0.DefaultBrowseFolder;
@@ -72,6 +73,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnExportSizeChanged(ExportSize value) => OnPropertyChanged(nameof(ExportSizeIndex));
     [ObservableProperty] public partial bool UseHttps { get; set; }
+    [ObservableProperty] public partial bool LockOnExport { get; set; }
     [ObservableProperty] public partial bool MoonLineEnabled { get; set; }
     [ObservableProperty] public partial string Theme { get; set; }
     [ObservableProperty] public partial string? DefaultBrowseFolder { get; set; }
@@ -190,6 +192,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         s.JpegQuality = JpegQuality;
         s.ExportSize = ExportSize;
         s.UseHttps = UseHttps;
+        s.LockOnExport = LockOnExport;
         s.MoonLineEnabled = MoonLineEnabled;
         s.Theme = Theme;
         s.DefaultBrowseFolder = DefaultBrowseFolder;

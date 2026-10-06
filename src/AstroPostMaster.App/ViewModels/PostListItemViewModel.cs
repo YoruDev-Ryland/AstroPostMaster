@@ -7,6 +7,8 @@ public sealed partial class PostListItemViewModel(Post post) : ObservableObject
 {
     public Post Post { get; } = post;
     public string Title => Post.Title;
+    public bool IsLocked => Post.IsLocked;
+    public string LockLabel => Post.IsLocked ? "Unlock" : "Lock";
     public string Subtitle
     {
         get
@@ -20,5 +22,7 @@ public sealed partial class PostListItemViewModel(Post post) : ObservableObject
     {
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
+        OnPropertyChanged(nameof(IsLocked));
+        OnPropertyChanged(nameof(LockLabel));
     }
 }

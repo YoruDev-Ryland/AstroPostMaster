@@ -31,22 +31,30 @@ public class PostFactoryTests
     }
 
     [Fact]
-    public void Duplicate_CopiesCaptionButNotSlidesOrSource()
+    public void Duplicate_CopiesEverything_ButIsUnlocked()
     {
         var source = PostFactory.CreateNew(Sites, Rigs, Software, Sets);
         source.Title = "M31";
         source.SourcePath = "/x/m31.jpg";
-        source.Slides.Add(new Slide(SlideKind.Crop, new RectF(0.1, 0.1, 0.2, 0.2)));
+        source.Aspect = AspectRatio.Square;
+        source.ExportSize = ExportSize.Instagram1080;
+        source.IsLocked = true;
+        source.Slides.Insert(0, new Slide(SlideKind.Crop, new RectF(0.1, 0.1, 0.2, 0.2)));
         source.Caption.Broadband.AddRange(["R", "G", "B"]);
 
         var copy = PostFactory.Duplicate(source);
 
         Assert.NotEqual(source.Id, copy.Id);
         Assert.Equal("M31 copy", copy.Title);
-        Assert.Null(copy.SourcePath);
-        Assert.Equal(new[] { Slide.FullImage }, copy.Slides);
+        Assert.Equal("/x/m31.jpg", copy.SourcePath);
+        Assert.Equal(source.Slides, copy.Slides);
+        Assert.Equal(AspectRatio.Square, copy.Aspect);
+        Assert.Equal(ExportSize.Instagram1080, copy.ExportSize);
+        Assert.False(copy.IsLocked);
         Assert.Equal(new[] { "R", "G", "B" }, copy.Caption.Broadband);
         copy.Caption.Broadband.Add("L");
+        copy.Slides.Clear();
         Assert.Equal(3, source.Caption.Broadband.Count);
+        Assert.Equal(2, source.Slides.Count);
     }
 }

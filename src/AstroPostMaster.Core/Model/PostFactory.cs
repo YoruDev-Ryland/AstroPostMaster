@@ -17,15 +17,14 @@ public static class PostFactory
         return post;
     }
 
-    /// <summary>Deep copy of everything except the source image and slides, as a starting point for a new post.</summary>
+    /// <summary>Deep, unlocked copy of everything (image, slides, shape, caption), as a starting point for a new post.</summary>
     public static Post Duplicate(Post source)
     {
         var copy = JsonSerializer.Deserialize<Post>(JsonSerializer.Serialize(source, Json.Options), Json.Options)!;
         copy.Id = Post.NewId();
         copy.Title = source.Title + " copy";
         copy.CreatedUtc = copy.UpdatedUtc = DateTimeOffset.UtcNow;
-        copy.SourcePath = null;
-        copy.Slides = [Slide.FullImage];
+        copy.IsLocked = false;
         return copy;
     }
 }

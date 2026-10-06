@@ -208,6 +208,8 @@
               </ComboBox.SelectionBoxItemTemplate>
             </ComboBox>
 
+            <CheckBox Content="Lock posts after export" IsChecked="{Binding LockOnExport}" Margin="0,10,0,0" />
+
             <TextBlock Classes="section" Text="JPEG QUALITY" />
             <Grid ColumnDefinitions="*,48">
               <Slider Minimum="60" Maximum="100" Value="{Binding JpegQuality}" TickFrequency="1" IsSnapToTickEnabled="True" />

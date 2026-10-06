@@ -29,7 +29,7 @@ public sealed partial class EditorViewModel : ObservableObject
         _ui = ui;
         foreach (var slide in post.Slides) Slides.Add(new SlideViewModel(slide));
         Renumber();
-        Caption = new CaptionViewModel(post.Caption, state, Changed);
+        Caption = new CaptionViewModel(post.Caption, state, Changed, () => Post.IsLocked);
         Recompute();
     }
 
@@ -57,7 +57,9 @@ public sealed partial class EditorViewModel : ObservableObject
         set
         {
             if (Post.ExportSize == value) return;
+            if (IsLocked) { RaiseExportSize(); return; }
             Post.ExportSize = value;
+            RememberExportSize(value);
             RaiseExportSize();
             Changed();
         }
@@ -70,6 +72,15 @@ public sealed partial class EditorViewModel : ObservableObject
     }
 
     public string ExportSizeLabel => ExportSizeOption.All[ExportSizeIndex].Label;
+
+    /// <summary>The last size picked becomes the default for new posts.</summary>
+    private void RememberExportSize(ExportSize size)
+    {
+        if (_state.Settings.ExportSize == size) return;
+        _state.Settings.ExportSize = size;
+        try { _state.SaveSettings(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* still remembered for this session */ }
+    }
 
     private void RaiseExportSize()
     {
@@ -107,7 +118,28 @@ public sealed partial class EditorViewModel : ObservableObject
     public string Title
     {
         get => Post.Title;
-        set { if (Post.Title != value) { Post.Title = value; OnPropertyChanged(); Changed(); } }
+        set
+        {
+            if (Post.Title == value) return;
+            if (IsLocked) { OnPropertyChanged(); return; }
+            Post.Title = value;
+            OnPropertyChanged();
+            Changed();
+        }
+    }
+
+    /// <summary>A locked post is read-only: slides, image, shape, size, title and caption.</summary>
+    public bool IsLocked
+    {
+        get => Post.IsLocked;
+        set
+        {
+            if (Post.IsLocked == value) return;
+            Post.IsLocked = value;
+            OnPropertyChanged();
+            FramesChanged?.Invoke();
+            Changed();
+        }
     }
 
     public AspectRatio Aspect
@@ -116,6 +148,7 @@ public sealed partial class EditorViewModel : ObservableObject
         set
         {
             if (Post.Aspect == value) return;
+            if (IsLocked) { OnPropertyChanged(); OnPropertyChanged(nameof(AspectIndex)); return; }
             Post.Aspect = value;
             Refit();
             OnPropertyChanged();
@@ -188,6 +221,9 @@ public sealed partial class EditorViewModel : ObservableObject
         });
     }
 
+    /// <summary>Swaps in a different image, keeping every slide (re-fitted to the new image). Ignored when locked.</summary>
+    public Task ReplaceImageAsync(string path) => IsLocked ? Task.CompletedTask : SetSourceAsync(path);
+
     private void ApplySource(PreviewResult result)
     {
         var old = Preview;
@@ -209,14 +245,14 @@ public sealed partial class EditorViewModel : ObservableObject
     [RelayCommand]
     private void AddCrop()
     {
-        if (!HasSource) return;
+        if (!HasSource || IsLocked) return;
         Insert(new Slide(SlideKind.Crop, SlideGeometry.DefaultCrop(Aspect, SourceWidth, SourceHeight)));
     }
 
     [RelayCommand]
     private void AddPanorama(int panels)
     {
-        if (!HasSource) return;
+        if (!HasSource || IsLocked) return;
         panels = Math.Clamp(panels, 2, 5);
         Insert(new Slide(SlideKind.Panorama, SlideGeometry.DefaultPanorama(Aspect, panels, SourceWidth, SourceHeight), panels));
     }
@@ -224,7 +260,7 @@ public sealed partial class EditorViewModel : ObservableObject
     [RelayCommand]
     private void AddFullImage()
     {
-        if (Slides.Any(s => s.IsFull)) return;
+        if (IsLocked || Slides.Any(s => s.IsFull)) return;
         var slide = new SlideViewModel(Slide.FullImage);
         Slides.Add(slide);
         SelectedSlide = slide;
@@ -234,7 +270,7 @@ public sealed partial class EditorViewModel : ObservableObject
     [RelayCommand]
     private void RemoveSelectedSlide()
     {
-        if (SelectedSlide is not { } slide) return;
+        if (IsLocked || SelectedSlide is not { } slide) return;
         var index = Slides.IndexOf(slide);
         Slides.RemoveAt(index);
         SelectedSlide = Slides.Count == 0 ? null : Slides[Math.Min(index, Slides.Count - 1)];
@@ -243,7 +279,7 @@ public sealed partial class EditorViewModel : ObservableObject
 
     public void MoveSlide(int from, int to)
     {
-        if (from == to || from < 0 || to < 0 || from >= Slides.Count || to >= Slides.Count) return;
+        if (IsLocked || from == to || from < 0 || to < 0 || from >= Slides.Count || to >= Slides.Count) return;
         Slides.Move(from, to);
         SlidesChanged();
     }
@@ -251,7 +287,7 @@ public sealed partial class EditorViewModel : ObservableObject
     /// <summary>Applies a proposed frame (from dragging) after locking its ratio and clamping it inside the image.</summary>
     public void UpdateFrame(SlideViewModel slide, RectF proposed)
     {
-        if (slide.IsFull || !HasSource) return;
+        if (slide.IsFull || !HasSource || IsLocked) return;
         var fitted = SlideGeometry.FitLocked(proposed, SlideGeometry.FrameRatio(Aspect, slide.Panels), SourceWidth, SourceHeight);
         if (fitted == slide.Rect) return;
         slide.Model = slide.Model with { Rect = fitted };

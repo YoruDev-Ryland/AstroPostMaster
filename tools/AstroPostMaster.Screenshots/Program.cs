@@ -197,7 +197,48 @@ andromeda.ExportSize = ExportSize.LongEdge2048;
 andromeda.SelectedSlide = andromeda.Slides[1];
 Shot(main, "landscape.png");
 
-// ---------- settings ----------
+// ---------- zoom, lock, slideshow checks ----------
+andromeda.Aspect = AspectRatio.Portrait4x5;
+andromeda.ExportSize = ExportSize.Full;
+andromeda.SelectedSlide = andromeda.Slides[1];
+Pump(() => false, 200);
+var cropRect = andromeda.Slides[1].Rect;
+var zoomAt = ToWindow(cropRect.CenterX, cropRect.CenterY);
+main.MouseWheel(zoomAt, new Vector(0, -5));                       // zoom out first: must stay at the fit
+Pump(() => false, 100);
+if (canvas.Zoom != 1) throw new InvalidOperationException("Zoomed out past the fit view.");
+main.MouseWheel(zoomAt, new Vector(0, 6));                        // zoom in toward the crop
+Pump(() => false, 150);
+Shot(main, "zoomed.png");
+Console.WriteLine($"zoom: {canvas.Zoom:0.00}x");
+if (canvas.Zoom <= 1) throw new InvalidOperationException("Mouse wheel did not zoom.");
+main.KeyPress(Key.D0, RawInputModifiers.None, PhysicalKey.Digit0, "0");
+Pump(() => false, 100);
+if (canvas.Zoom != 1) throw new InvalidOperationException("0 did not return to the fit view.");
+
+andromeda.IsLocked = true;
+var lockedRect = andromeda.Slides[1].Rect;
+var lockedFrom = ToWindow(lockedRect.CenterX, lockedRect.CenterY);
+main.MouseDown(lockedFrom, MouseButton.Left);
+main.MouseMove(lockedFrom + new Point(120, 40));
+main.MouseUp(lockedFrom + new Point(120, 40), MouseButton.Left);
+if (andromeda.Slides[1].Rect != lockedRect) throw new InvalidOperationException("A locked crop moved.");
+Shot(main, "locked.png");
+Console.WriteLine("lock: drag ignored");
+
+vm0.StartSlideshowCommand.Execute(null);
+Pump(() => false, 700);
+Shot(main, "slideshow.png");
+main.KeyPress(Key.Right, RawInputModifiers.None, PhysicalKey.ArrowRight, null);
+Pump(() => false, 300);
+Console.WriteLine($"slideshow: {vm0.Slideshow?.Position}");
+if (vm0.Slideshow?.Index != 1) throw new InvalidOperationException("Right arrow did not advance the slideshow.");
+main.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+Pump(() => false, 200);
+if (vm0.Slideshow is not null) throw new InvalidOperationException("Escape did not close the slideshow.");
+andromeda.IsLocked = false;
+
+
 var settings = new SettingsWindow(new SettingsViewModel(state0)) { Width = 820, Height = 620 };
 settings.Show();
 settings.GetVisualDescendants().OfType<TabControl>().Skip(1).First().SelectedIndex = 1; // Profiles → Rigs

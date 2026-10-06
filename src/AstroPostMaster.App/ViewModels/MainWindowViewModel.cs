@@ -11,9 +11,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IPreviewLoader _loader;
     private readonly IUiDispatcher _ui;
+    private readonly TimeProvider _time;
 
-    public MainWindowViewModel(AppState state, IPreviewLoader loader, IUiDispatcher ui)
+    public MainWindowViewModel(AppState state, IPreviewLoader loader, IUiDispatcher ui, TimeProvider? time = null)
     {
+        _time = time ?? TimeProvider.System;
         State = state;
         _loader = loader;
         _ui = ui;
@@ -60,14 +62,33 @@ public sealed partial class MainWindowViewModel : ObservableObject
         editor.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(EditorViewModel.Warnings) or nameof(EditorViewModel.SaveError)) OnPropertyChanged(nameof(StatusLine));
-            if (e.PropertyName is nameof(EditorViewModel.Title) or nameof(EditorViewModel.SlideCount)) newValue.Refresh();
+            if (e.PropertyName is nameof(EditorViewModel.Title) or nameof(EditorViewModel.SlideCount) or nameof(EditorViewModel.IsLocked)) newValue.Refresh();
+            if (e.PropertyName is nameof(EditorViewModel.HasSource) or nameof(EditorViewModel.SlideCount)) StartSlideshowCommand.NotifyCanExecuteChanged();
         };
         Editor = editor;
         previous?.Dispose();
         EditorLoading = editor.LoadSourceAsync();
     }
 
-    partial void OnEditorChanged(EditorViewModel? value) => OnPropertyChanged(nameof(StatusLine));
+    partial void OnEditorChanged(EditorViewModel? value)
+    {
+        OnPropertyChanged(nameof(StatusLine));
+        StartSlideshowCommand.NotifyCanExecuteChanged();
+    }
+
+    [ObservableProperty] public partial SlideshowViewModel? Slideshow { get; private set; }
+
+    private bool CanStartSlideshow() => Editor is { HasSource: true } e && e.Slides.Count > 0;
+
+    [RelayCommand(CanExecute = nameof(CanStartSlideshow))]
+    private void StartSlideshow()
+    {
+        if (!CanStartSlideshow()) return;
+        var show = new SlideshowViewModel(Editor!, _ui, _time);
+        show.Closed += () => Slideshow = null;
+        Slideshow = show;
+        show.Start();
+    }
 
     /// <summary>Call after the settings window saved: profiles, template or export options may have changed.</summary>
     public void SettingsChanged()
@@ -83,17 +104,44 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Add(post);
     }
 
+    /// <summary>Copies a post (the open one by default) and places the copy right below it.</summary>
     [RelayCommand]
-    private void DuplicatePost()
+    private void DuplicatePost(PostListItemViewModel? item)
     {
-        if (Editor is null) return;
-        Add(PostFactory.Duplicate(Editor.Post));
+        item ??= SelectedPost;
+        if (item is null) return;
+        if (ReferenceEquals(item, SelectedPost)) _ = Editor?.FlushAsync();
+        var copy = PostFactory.Duplicate(item.Post);
+        State.Store.SavePost(copy);
+        var copyItem = new PostListItemViewModel(copy);
+        Posts.Insert(Posts.IndexOf(item) + 1, copyItem);
+        SelectedPost = copyItem;
+    }
+
+    [RelayCommand]
+    private void ToggleLock(PostListItemViewModel? item)
+    {
+        item ??= SelectedPost;
+        if (item is null) return;
+        if (ReferenceEquals(item, SelectedPost) && Editor is not null)
+        {
+            Editor.IsLocked = !Editor.IsLocked;
+            return;
+        }
+        item.Post.IsLocked = !item.Post.IsLocked;
+        State.Store.SavePost(item.Post);
+        item.Refresh();
     }
 
     [RelayCommand]
     private void DeletePost()
     {
         if (SelectedPost is not { } item) return;
+        if (item.IsLocked)
+        {
+            StatusMessage = "Post is locked.";
+            return;
+        }
         var index = Posts.IndexOf(item);
         try
         {

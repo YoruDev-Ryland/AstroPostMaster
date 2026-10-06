@@ -57,6 +57,8 @@ public sealed class Post
     public AspectRatio Aspect { get; set; } = AspectRatio.Portrait4x5;
     /// <summary>Per-post override of <see cref="AppSettings.ExportSize"/>; null follows the setting.</summary>
     public ExportSize? ExportSize { get; set; }
+    /// <summary>A locked post is read-only (slides, image, caption) until unlocked.</summary>
+    public bool IsLocked { get; set; }
     public List<Slide> Slides { get; set; } = [];
     public CaptionInput Caption { get; set; } = new();
 

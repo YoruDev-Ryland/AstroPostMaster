@@ -21,6 +21,8 @@ public sealed class AppSettings
     public string CaptionTemplate { get; set; } = DefaultCaptionTemplate.Text;
     public int JpegQuality { get; set; } = 92;
     public ExportSize ExportSize { get; set; } = ExportSize.Full;
+    /// <summary>Lock a post automatically after it is exported or sent to a phone.</summary>
+    public bool LockOnExport { get; set; }
     public WatermarkSettings Watermark { get; set; } = new();
     public bool MoonLineEnabled { get; set; }
     /// <summary>Serve the phone page over self-signed HTTPS. Default follows the Task 1 spike decision.</summary>

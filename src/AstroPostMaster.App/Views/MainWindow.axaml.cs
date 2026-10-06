@@ -1,7 +1,9 @@
 using AstroPostMaster.App.Services;
 using AstroPostMaster.App.ViewModels;
 using AstroPostMaster.Handoff.Firewall;
+using Avalonia.Animation;
 using Avalonia.Controls;
+using Avalonia.Styling;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
@@ -34,6 +36,11 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
         KeyDown += OnKeyDown;
+        KeyUp += OnKeyUp;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainWindowViewModel.Slideshow)) OnSlideshowChanged();
+        };
         Closing += (_, _) => _vm.Editor?.FlushAsync();
     }
 
@@ -79,6 +86,68 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnReplaceImage(object? sender, RoutedEventArgs e)
+    {
+        if (_vm.Editor is not { HasSource: true, IsLocked: false } editor) return;
+        var options = new FilePickerOpenOptions { Title = "Replace image", AllowMultiple = false, FileTypeFilter = [ImageFiles] };
+        if (editor.Post.SourcePath is { } current && Path.GetDirectoryName(current) is { } folder && Directory.Exists(folder))
+            options.SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(folder);
+        var files = await StorageProvider.OpenFilePickerAsync(options);
+        if (files.FirstOrDefault()?.TryGetLocalPath() is not { } path) return;
+        try
+        {
+            await editor.ReplaceImageAsync(path);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or IOException or UnauthorizedAccessException or AstroPostMaster.Imaging.ImageLoadException)
+        {
+            _vm.StatusMessage = ex.Message;
+        }
+    }
+
+    // ---------- slideshow ----------
+
+    private SlideshowViewModel? _show;
+    private CancellationTokenSource? _fade;
+
+    private void OnSlideshowChanged()
+    {
+        if (_show is not null) _show.PropertyChanged -= OnSlideshowPropertyChanged;
+        _show = _vm.Slideshow;
+        if (_show is null)
+        {
+            Canvas.Focus();
+            return;
+        }
+        _show.PropertyChanged += OnSlideshowPropertyChanged;
+        SlideshowOverlay.Focus();
+        Fade(TimeSpan.FromMilliseconds(500));
+    }
+
+    private void OnSlideshowPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SlideshowViewModel.Index) && _show is not null)
+            Fade(TimeSpan.FromMilliseconds(_show.LastChangeWasManual ? 160 : 500));
+    }
+
+    private void Fade(TimeSpan duration)
+    {
+        _fade?.Cancel();
+        _fade = new CancellationTokenSource();
+        var animation = new Animation
+        {
+            Duration = duration,
+            FillMode = FillMode.Forward,
+            Children =
+            {
+                new KeyFrame { Cue = new Cue(0), Setters = { new Setter(OpacityProperty, 0d) } },
+                new KeyFrame { Cue = new Cue(1), Setters = { new Setter(OpacityProperty, 1d) } },
+            },
+        };
+        _ = animation.RunAsync(SlideshowImage, _fade.Token);
+    }
+
+    private void OnSlideshowPointerPressed(object? sender, PointerPressedEventArgs e) => _vm.Slideshow?.Close();
+
     private void OnToggleSidebar(object? sender, RoutedEventArgs e) => Sidebar.IsVisible = !Sidebar.IsVisible;
 
     // ---------- export ----------
@@ -115,7 +184,25 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (_vm.Slideshow is { } show)
+        {
+            switch (e.Key)
+            {
+                case Key.Right or Key.Down or Key.Space or Key.PageDown: show.Next(); break;
+                case Key.Left or Key.Up or Key.PageUp: show.Previous(); break;
+                case Key.Escape or Key.F5: show.Close(); break;
+            }
+            e.Handled = true;
+            return;
+        }
+
         var typing = FocusManager?.GetFocusedElement() is TextBox;
+        if (e.Key == Key.Space && !typing)
+        {
+            Canvas.PanModifier = true;
+            e.Handled = true;
+            return;
+        }
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta);
         var editor = _vm.Editor;
 
@@ -128,8 +215,15 @@ public partial class MainWindow : Window
             case Key.C when !ctrl && !typing && editor is not null: editor.AddCropCommand.Execute(null); break;
             case Key.P when !ctrl && !typing && editor is not null: editor.AddPanoramaCommand.Execute(3); break;
             case Key.Delete when !typing && editor is not null: editor.RemoveSelectedSlideCommand.Execute(null); break;
+            case Key.F5: _vm.StartSlideshowCommand.Execute(null); break;
+            case Key.D0 or Key.NumPad0 when !typing && !ctrl: Canvas.ResetZoom(); break;
             default: return;
         }
         e.Handled = true;
+    }
+
+    private void OnKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space) Canvas.PanModifier = false;
     }
 }

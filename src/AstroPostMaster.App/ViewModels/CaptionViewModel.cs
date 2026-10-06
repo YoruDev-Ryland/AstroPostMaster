@@ -17,12 +17,14 @@ public sealed partial class CaptionViewModel : ObservableObject
     private readonly CaptionInput _input;
     private readonly AppState _state;
     private readonly Action _changed;
+    private readonly Func<bool> _isLocked;
 
-    public CaptionViewModel(CaptionInput input, AppState state, Action changed)
+    public CaptionViewModel(CaptionInput input, AppState state, Action changed, Func<bool>? isLocked = null)
     {
         _input = input;
         _state = state;
         _changed = changed;
+        _isLocked = isLocked ?? (() => false);
 
         BroadbandChips = Broadband.Select(b => new SelectableItem(b.Key, b.Label, input.Broadband.Contains(b.Key), OnBroadbandToggled)).ToList();
         NarrowbandChips = Narrowband.Select(n => new SelectableItem(n.Key, n.Label, PaletteHas(input.Palette, n.Key), OnNarrowbandToggled)).ToList();
@@ -50,12 +52,20 @@ public sealed partial class CaptionViewModel : ObservableObject
 
     // ---------- target ----------
 
+    /// <summary>True (and the UI is told to re-read <paramref name="property"/>) when the post is locked.</summary>
+    private bool Rejected(string property)
+    {
+        if (!_isLocked()) return false;
+        OnPropertyChanged(property);
+        return true;
+    }
+
     public string TargetText
     {
         get => _input.TargetText;
         set
         {
-            if (_input.TargetText == value) return;
+            if (_input.TargetText == value || Rejected(nameof(TargetText))) return;
             _input.TargetText = value;
             _input.TargetCatalogId = null;
             Notify(nameof(TargetText));
@@ -70,6 +80,7 @@ public sealed partial class CaptionViewModel : ObservableObject
 
     public void SelectTarget(CatalogEntry entry)
     {
+        if (Rejected(nameof(TargetText))) return;
         _input.TargetText = TargetCatalog.Display(entry);
         _input.TargetCatalogId = entry.PrimaryId;
         Notify(nameof(TargetText));
@@ -111,7 +122,7 @@ public sealed partial class CaptionViewModel : ObservableObject
     public string Description
     {
         get => _input.Description;
-        set { if (_input.Description != value) { _input.Description = value; Notify(nameof(Description)); } }
+        set { if (_input.Description != value && !Rejected(nameof(Description))) { _input.Description = value; Notify(nameof(Description)); } }
     }
 
     // ---------- profiles ----------
@@ -119,19 +130,19 @@ public sealed partial class CaptionViewModel : ObservableObject
     public Site? Site
     {
         get => Profiles.ById(_state.Sites, _input.SiteId);
-        set { if (!_state.IsReplacingProfiles && _input.SiteId != value?.Id) { _input.SiteId = value?.Id; Notify(nameof(Site)); } }
+        set { if (!_state.IsReplacingProfiles && _input.SiteId != value?.Id && !Rejected(nameof(Site))) { _input.SiteId = value?.Id; Notify(nameof(Site)); } }
     }
 
     public Rig? Rig
     {
         get => Profiles.ById(_state.Rigs, _input.RigId);
-        set { if (!_state.IsReplacingProfiles && _input.RigId != value?.Id) { _input.RigId = value?.Id; Notify(nameof(Rig)); } }
+        set { if (!_state.IsReplacingProfiles && _input.RigId != value?.Id && !Rejected(nameof(Rig))) { _input.RigId = value?.Id; Notify(nameof(Rig)); } }
     }
 
     public SoftwareSet? Software
     {
         get => Profiles.ById(_state.Software, _input.SoftwareId);
-        set { if (!_state.IsReplacingProfiles && _input.SoftwareId != value?.Id) { _input.SoftwareId = value?.Id; Notify(nameof(Software)); } }
+        set { if (!_state.IsReplacingProfiles && _input.SoftwareId != value?.Id && !Rejected(nameof(Software))) { _input.SoftwareId = value?.Id; Notify(nameof(Software)); } }
     }
 
     // ---------- filters ----------
@@ -144,7 +155,7 @@ public sealed partial class CaptionViewModel : ObservableObject
             // A ComboBox writes null when its selection leaves ItemsSource; palettes are cleared via the chips instead.
             if (string.IsNullOrWhiteSpace(value)) return;
             var normalized = value.Trim().ToUpperInvariant();
-            if (_input.Palette == normalized) return;
+            if (_input.Palette == normalized || Rejected(nameof(Palette))) return;
             _input.Palette = normalized;
             Notify(nameof(Palette), nameof(PaletteOptions), nameof(FilterText));
         }
@@ -157,20 +168,22 @@ public sealed partial class CaptionViewModel : ObservableObject
         set
         {
             var overrideText = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-            if (_input.FilterOverride == overrideText) return;
+            if (_input.FilterOverride == overrideText || Rejected(nameof(FilterText))) return;
             _input.FilterOverride = overrideText;
             Notify(nameof(FilterText));
         }
     }
 
-    private void OnBroadbandToggled(SelectableItem _)
+    private void OnBroadbandToggled(SelectableItem chip)
     {
+        if (_isLocked()) { chip.Revert(!chip.IsSelected); return; }
         _input.Broadband = BroadbandChips.Where(c => c.IsSelected).Select(c => c.Key).ToList();
         Notify(nameof(FilterText));
     }
 
-    private void OnNarrowbandToggled(SelectableItem _)
+    private void OnNarrowbandToggled(SelectableItem chip)
     {
+        if (_isLocked()) { chip.Revert(!chip.IsSelected); return; }
         bool On(string key) => NarrowbandChips.Single(c => c.Key == key).IsSelected;
         var palette = FilterString.DefaultPalette(On("Ha"), On("OIII"), On("SII"));
         _input.Palette = palette.Length == 0 ? null : palette;
@@ -190,7 +203,7 @@ public sealed partial class CaptionViewModel : ObservableObject
     public string IntegrationText
     {
         get => _input.IntegrationText;
-        set { if (_input.IntegrationText != value) { _input.IntegrationText = value; Notify(nameof(IntegrationText), nameof(IntegrationTotal)); } }
+        set { if (_input.IntegrationText != value && !Rejected(nameof(IntegrationText))) { _input.IntegrationText = value; Notify(nameof(IntegrationText), nameof(IntegrationTotal)); } }
     }
 
     public string IntegrationTotal => CaptionBuilder.ResolveIntegration(_input);
@@ -201,6 +214,7 @@ public sealed partial class CaptionViewModel : ObservableObject
     public IntegrationRowViewModel AddIntegrationRow()
     {
         var row = new IntegrationRowViewModel(new IntegrationRow("", 0, 300), RowsChanged);
+        if (_isLocked()) return row; // detached: never reaches the post
         IntegrationRows.Add(row);
         RowsChanged();
         return row;
@@ -208,11 +222,12 @@ public sealed partial class CaptionViewModel : ObservableObject
 
     public void RemoveIntegrationRow(IntegrationRowViewModel row)
     {
-        if (IntegrationRows.Remove(row)) RowsChanged();
+        if (!_isLocked() && IntegrationRows.Remove(row)) RowsChanged();
     }
 
     private void RowsChanged()
     {
+        if (_isLocked()) return;
         _input.IntegrationRows = IntegrationRows.Select(r => r.ToModel()).Where(r => r.Subs > 0 && r.SubSeconds > 0).ToList();
         Notify(nameof(IntegrationTotal), nameof(IntegrationPlaceholder));
     }
@@ -227,7 +242,7 @@ public sealed partial class CaptionViewModel : ObservableObject
         get => _datesText;
         set
         {
-            if (!SetProperty(ref _datesText, value)) return;
+            if (Rejected(nameof(DatesText)) || !SetProperty(ref _datesText, value)) return;
             var valid = new List<DateOnly>();
             var invalid = false;
             foreach (var token in value.Split([',', ' ', ';', '\n'], StringSplitOptions.RemoveEmptyEntries))
@@ -250,7 +265,7 @@ public sealed partial class CaptionViewModel : ObservableObject
         get => _extraHashtagsText;
         set
         {
-            if (!SetProperty(ref _extraHashtagsText, value)) return;
+            if (Rejected(nameof(ExtraHashtagsText)) || !SetProperty(ref _extraHashtagsText, value)) return;
             _input.ExtraHashtags = Hashtags.Split(value).ToList();
             Notify();
         }
@@ -259,8 +274,9 @@ public sealed partial class CaptionViewModel : ObservableObject
     private IReadOnlyList<SelectableItem> BuildHashtagSets() =>
         _state.HashtagSets.Select(s => new SelectableItem(s.Id, s.Name, _input.HashtagSetIds.Contains(s.Id), OnHashtagSetToggled)).ToList();
 
-    private void OnHashtagSetToggled(SelectableItem _)
+    private void OnHashtagSetToggled(SelectableItem set)
     {
+        if (_isLocked()) { set.Revert(!set.IsSelected); return; }
         _input.HashtagSetIds = HashtagSets.Where(s => s.IsSelected).Select(s => s.Key).ToList();
         Notify();
     }

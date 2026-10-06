@@ -6,6 +6,7 @@
              x:DataType="vm:EditorViewModel">
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="16,4,16,20">
+      <StackPanel IsEnabled="{Binding !IsLocked}">
 
       <TextBlock Classes="section" Text="TARGET" />
       <AutoCompleteBox x:Name="TargetBox" PlaceholderText="M31, Heart Nebula, Sh2-129…"
@@ -138,6 +139,8 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
       <TextBox Text="{Binding Caption.ExtraHashtagsText}" PlaceholderText="#extra #tags" Margin="0,6,0,0" />
+
+      </StackPanel>
 
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Classes="section" Text="CAPTION" />

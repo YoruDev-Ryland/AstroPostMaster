@@ -28,6 +28,8 @@ Nothing is uploaded anywhere. The phone fetches the finished slides and caption 
 - Proper sRGB conversion, so Adobe RGB and wide-gamut exports don't look washed out
 - Reads JPG, PNG and TIFF, including 16-bit TIFF and very large mosaics
 - Optional watermark
+- Zoom in with the mouse wheel to place a crop precisely on a small object
+- Slideshow preview that plays the carousel inside the app window
 
 **Captions**
 - Reusable profiles for sites, rigs, software and hashtag sets, with defaults filled in automatically
@@ -36,6 +38,11 @@ Nothing is uploaded anywhere. The phone fetches the finished slides and caption 
 - Filter chips that build strings like `RGBHOO` or `LRGBSHO`
 - Integration time as a total or per filter, nights, and optional moon phase
 - Fully editable caption template
+
+**Posts**
+- Lock a post to keep it exactly as it was posted, or lock automatically after every export
+- Duplicate a post with all its slides, then swap in a new image to compare versions with identical crops
+- The last slide size you picked becomes the default for new posts
 
 **Phone handoff**
 - Scan a QR code and the phone opens a page with **Copy caption** and **Share images**
@@ -79,7 +86,7 @@ On Windows, SmartScreen may warn that the app is unrecognized because it isn't c
 
 1. **Add your profiles.** Open Settings and add your site (with Bortle class), rig, software and a few hashtag sets. Mark the ones you use most as defaults.
 2. **Open an image.** Drag a finished image onto the window or use **Open image**. The target is filled in when it can be guessed from the file name.
-3. **Build the carousel.** Pick a shape, then add slides. Press `C` for a crop or `P` for a 3-slide panorama; more options are under **+ Slide**. Drag frames to move them, drag a corner to resize, and drag thumbnails to reorder.
+3. **Build the carousel.** Pick a shape, then add slides. Press `C` for a crop or `P` for a 3-slide panorama; more options are under **+ Slide**. Drag frames to move them, drag a corner to resize, and drag thumbnails to reorder. Scroll to zoom, drag with the right mouse button (or hold Space) to pan, and press `0` to fit again. `F5` plays the slideshow.
 4. **Fill in the details.** Tap your filters, enter the integration time and, if you like, the nights and a short description.
 5. **Send it.** Choose a slide size next to **Export**, then **Export ▸ Send to phone** and scan the code. Copy the caption, share the images, add a song in Instagram and post.
 

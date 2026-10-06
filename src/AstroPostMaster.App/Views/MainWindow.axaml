@@ -23,6 +23,9 @@
               <Button Classes="icon" Command="{Binding DuplicatePostCommand}" ToolTip.Tip="Duplicate post">
                 <Path Classes="icon" Data="{StaticResource IconDuplicate}" />
               </Button>
+              <Button Classes="icon" Command="{Binding ToggleLockCommand}" ToolTip.Tip="Lock or unlock post">
+                <Path Classes="icon" Data="{StaticResource IconLock}" />
+              </Button>
               <Button Classes="icon" Click="OnDeletePost" ToolTip.Tip="Delete post">
                 <Path Classes="icon" Data="{StaticResource IconTrash}" />
               </Button>
@@ -34,10 +37,22 @@
           <ListBox ItemsSource="{Binding Posts}" SelectedItem="{Binding SelectedPost}" Background="Transparent">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:PostListItemViewModel">
-                <StackPanel Margin="2,3">
-                  <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11" />
-                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" Margin="2,3" Background="Transparent">
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="{Binding LockLabel}"
+                                Command="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).ToggleLockCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="Duplicate"
+                                Command="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).DuplicatePostCommand}" CommandParameter="{Binding}" />
+                    </ContextMenu>
+                  </Grid.ContextMenu>
+                  <StackPanel>
+                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11" />
+                  </StackPanel>
+                  <Path Grid.Column="1" Classes="icon" Data="{StaticResource IconLock}" Width="13" Height="13" Margin="8,0,2,0"
+                        Stroke="{DynamicResource MutedBrush}" VerticalAlignment="Center" IsVisible="{Binding IsLocked}" />
+                </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
@@ -47,15 +62,22 @@
       <!-- Editor -->
       <Grid Grid.Column="1" RowDefinitions="48,*,Auto">
         <Border Classes="panel" BorderThickness="0,0,0,1">
-          <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="8,0,12,0">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="8,0,12,0">
             <Button Classes="icon" Click="OnToggleSidebar" ToolTip.Tip="Show or hide posts" VerticalAlignment="Center">
               <Path Classes="icon" Data="{StaticResource IconSidebar}" />
             </Button>
             <TextBox Grid.Column="1" Text="{Binding Editor.Title, FallbackValue=''}" IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}"
+                     IsReadOnly="{Binding Editor.IsLocked, FallbackValue=False}"
                      FontSize="15" FontWeight="SemiBold" BorderThickness="0" Background="Transparent" Margin="4,0,12,0"
                      VerticalAlignment="Center" MaxWidth="460" HorizontalAlignment="Left" PlaceholderText="Post title" />
-            <ComboBox Grid.Column="2" x:Name="AspectBox" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="150"
+            <ToggleButton Grid.Column="2" Classes="icon" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Lock post"
+                          IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}"
+                          IsChecked="{Binding Editor.IsLocked, FallbackValue=False}">
+              <Path Classes="icon" Data="{StaticResource IconLock}" />
+            </ToggleButton>
+            <ComboBox Grid.Column="3" x:Name="AspectBox" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="150"
                       IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}"
+                      IsEnabled="{Binding !Editor.IsLocked, FallbackValue=False}"
                       ItemsSource="{x:Static vm:EditorViewModel.AspectOptions}" SelectedIndex="{Binding Editor.AspectIndex, FallbackValue=0}"
                       ToolTip.Tip="Slide shape for the whole post">
               <ComboBox.ItemTemplate>
@@ -67,7 +89,16 @@
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
-            <Button Grid.Column="3" Click="OnOpenImage" VerticalAlignment="Center" ToolTip.Tip="Open an image (Ctrl+O)">
+            <Button Grid.Column="4" Classes="icon" Click="OnReplaceImage" VerticalAlignment="Center" Margin="0,0,4,0"
+                    ToolTip.Tip="Replace image, keep the slides" IsVisible="{Binding Editor.HasSource, FallbackValue=False}"
+                    IsEnabled="{Binding !Editor.IsLocked, FallbackValue=False}">
+              <Path Classes="icon" Data="{StaticResource IconReplace}" />
+            </Button>
+            <Button Grid.Column="5" Classes="icon" Command="{Binding StartSlideshowCommand}" VerticalAlignment="Center" Margin="0,0,8,0"
+                    ToolTip.Tip="Slideshow (F5)" IsVisible="{Binding Editor.HasSource, FallbackValue=False}">
+              <Path Classes="icon" Data="{StaticResource IconPlay}" />
+            </Button>
+            <Button Grid.Column="6" Click="OnOpenImage" VerticalAlignment="Center" ToolTip.Tip="Open an image (Ctrl+O)">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <Path Classes="icon" Data="{StaticResource IconImage}" />
                 <TextBlock Text="Open image" VerticalAlignment="Center" />
@@ -114,6 +145,7 @@
         <ComboBox Grid.Column="3" VerticalAlignment="Center" Margin="0,0,8,0" MinWidth="150"
                   IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}"
                   ItemsSource="{x:Static vm:EditorViewModel.ExportSizeOptions}" SelectedIndex="{Binding Editor.ExportSizeIndex, FallbackValue=0}"
+                  IsEnabled="{Binding !Editor.IsLocked, FallbackValue=False}"
                   ToolTip.Tip="Size of the exported slides for this post">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:ExportSizeOption">
@@ -144,6 +176,27 @@
           </Button.Flyout>
         </Button>
       </Grid>
+    </Border>
+
+    <!-- Slideshow: fills the app window, not the screen. -->
+    <Border x:Name="SlideshowOverlay" Grid.RowSpan="2" Background="Black" Focusable="True"
+            IsVisible="{Binding Slideshow, Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnSlideshowPointerPressed">
+      <Panel DataContext="{Binding Slideshow}" x:DataType="vm:SlideshowViewModel">
+        <Viewbox Margin="32" Stretch="Uniform">
+          <Border Width="{Binding FrameWidth}" Height="{Binding FrameHeight}" Background="Black">
+            <Image x:Name="SlideshowImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Image.Source>
+                <MultiBinding Converter="{x:Static views:ThumbnailConverter.Instance}">
+                  <Binding Path="Preview" />
+                  <Binding Path="Current.Rect" />
+                  <Binding Path="Current.Kind" />
+                </MultiBinding>
+              </Image.Source>
+            </Image>
+          </Border>
+        </Viewbox>
+        <TextBlock Text="{Binding Position}" Classes="stat" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20,14" />
+      </Panel>
     </Border>
   </Grid>
 </Window>

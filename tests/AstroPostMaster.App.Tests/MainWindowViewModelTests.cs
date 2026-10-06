@@ -102,19 +102,29 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task DuplicatePost_CopiesCaptionButNotSlidesOrSource()
+    public async Task DuplicatePost_CopiesSlidesAndImage_AndLandsRightBelowTheOriginal()
     {
         using var dir = new TempDir();
         var vm = await Create(dir);
-        await vm.OpenImageAsync(Sample.ImageFile(dir));
-        vm.Editor!.Caption.Description = "First light";
+        vm.NewPostCommand.Execute(null);                       // an unrelated newer post on top
+        await vm.OpenImageAsync(Sample.ImageFile(dir));         // fills it: "Heart Nebula"
+        vm.Editor!.AddCropCommand.Execute(null);
+        vm.Editor.Caption.Description = "First light";
+        vm.NewPostCommand.Execute(null);                       // another post above it
+        var original = vm.Posts[1];
+        vm.SelectedPost = original;
+        await vm.EditorLoading;
 
         vm.DuplicatePostCommand.Execute(null);
 
-        Assert.Equal(2, vm.Posts.Count);
-        Assert.Equal("Heart Nebula copy", vm.Editor!.Post.Title);
-        Assert.Null(vm.Editor.Post.SourcePath);
-        Assert.Equal("First light", vm.Editor.Post.Caption.Description);
+        Assert.Equal(3, vm.Posts.Count);
+        Assert.Same(original, vm.Posts[1]);
+        Assert.Equal("Heart Nebula copy", vm.Posts[2].Title);
+        Assert.Same(vm.Posts[2], vm.SelectedPost);
+        var copy = vm.Editor!.Post;
+        Assert.Equal(original.Post.SourcePath, copy.SourcePath);
+        Assert.Equal(original.Post.Slides, copy.Slides);
+        Assert.Equal("First light", copy.Caption.Description);
     }
 
     [Fact]

@@ -191,6 +191,7 @@ public sealed partial class PhoneExportViewModel : ObservableObject
         {
             _export = await Task.Run(() => PostExporter.Export(post, _caption, settings, exportDir, progress));
             Progress = 1;
+            if (settings.LockOnExport) _editor.IsLocked = true;
             return true;
         }
         catch (FileNotFoundException)

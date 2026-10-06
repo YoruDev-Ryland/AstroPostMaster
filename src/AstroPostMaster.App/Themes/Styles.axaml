@@ -41,6 +41,9 @@
     <Setter Property="Height" Value="16" />
     <Setter Property="Stretch" Value="Uniform" />
   </Style>
+  <Style Selector="Button:disabled Path.icon, ToggleButton:disabled Path.icon">
+    <Setter Property="Opacity" Value="0.35" />
+  </Style>
   <Style Selector="Button, ToggleButton, ComboBox, TextBox, AutoCompleteBox">
     <Setter Property="CornerRadius" Value="{StaticResource Radius}" />
   </Style>

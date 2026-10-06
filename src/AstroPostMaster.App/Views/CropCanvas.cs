@@ -29,7 +29,11 @@ public sealed class CropCanvas : Control, ICustomHitTest
     private static readonly Cursor NeswCursor = new(StandardCursorType.TopRightCorner);
     private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
 
-    private enum DragMode { None, Move, Resize }
+    private enum DragMode { None, Move, Resize, Pan }
+
+    private readonly Viewport _viewport = new();
+    private object? _viewportImage;
+    private Point _panLast;
 
     private DragMode _mode;
     private SlideViewModel? _dragSlide;
@@ -56,12 +60,24 @@ public sealed class CropCanvas : Control, ICustomHitTest
     // returning true unconditionally made the canvas swallow clicks meant for the toolbar above it.
     public bool HitTest(Point point) => new Rect(Bounds.Size).Contains(point);
 
+    /// <summary>While true (Space held), a left drag pans instead of moving frames.</summary>
+    public bool PanModifier { get; set; }
+
+    public double Zoom => _viewport.Zoom;
+
+    public void ResetZoom()
+    {
+        _viewport.Reset();
+        InvalidateVisual();
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
         if (change.Property != EditorProperty) return;
         if (change.OldValue is EditorViewModel old) old.FramesChanged -= InvalidateVisual;
         if (change.NewValue is EditorViewModel current) current.FramesChanged += InvalidateVisual;
+        _viewport.Reset();
         InvalidateVisual();
     }
 
@@ -81,6 +97,12 @@ public sealed class CropCanvas : Control, ICustomHitTest
             return;
         }
 
+        if (!ReferenceEquals(_viewportImage, bitmap))
+        {
+            _viewportImage = bitmap;   // a different image: start from the fit view again
+            _viewport.Reset();
+        }
+        using var clip = context.PushClip(new Rect(Bounds.Size));
         var image = ImageRect(bitmap);
         context.DrawImage(bitmap, new Rect(bitmap.Size), image);
 
@@ -143,15 +165,17 @@ public sealed class CropCanvas : Control, ICustomHitTest
     private IBrush Brush(string key, IBrush fallback) =>
         this.TryFindResource(key, ActualThemeVariant, out var value) && value is IBrush brush ? brush : fallback;
 
-    private Rect ImageRect(Bitmap bitmap)
+    private Rect Area => new Rect(Bounds.Size).Deflate(Inset);
+
+    private Rect ImageRect(Bitmap bitmap) => _viewport.ImageRect(Area, bitmap.Size);
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
-        var available = new Rect(Bounds.Size).Deflate(Inset);
-        var size = bitmap.Size;
-        if (available.Width <= 0 || available.Height <= 0 || size.Width <= 0) return default;
-        var scale = Math.Min(available.Width / size.Width, available.Height / size.Height);
-        var w = size.Width * scale;
-        var h = size.Height * scale;
-        return new Rect(available.X + (available.Width - w) / 2, available.Y + (available.Height - h) / 2, w, h);
+        base.OnPointerWheelChanged(e);
+        if (Editor?.Preview is not Bitmap bitmap) return;
+        _viewport.ZoomAt(e.GetPosition(this), Math.Pow(1.25, e.Delta.Y), Area, bitmap.Size);
+        InvalidateVisual();
+        e.Handled = true;
     }
 
     private static Rect ToCanvas(RectF r, Rect image) =>
@@ -165,7 +189,17 @@ public sealed class CropCanvas : Control, ICustomHitTest
     {
         base.OnPointerPressed(e);
         var editor = Editor;
-        if (editor is null || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (editor is null) return;
+        var props = e.GetCurrentPoint(this).Properties;
+        if (editor.Preview is Bitmap && (props.IsMiddleButtonPressed || props.IsRightButtonPressed || (props.IsLeftButtonPressed && PanModifier)))
+        {
+            _mode = DragMode.Pan;
+            _panLast = e.GetPosition(this);
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+        if (!props.IsLeftButtonPressed) return;
         Focus();
         if (editor.Preview is not Bitmap bitmap)
         {
@@ -176,7 +210,7 @@ public sealed class CropCanvas : Control, ICustomHitTest
         var image = ImageRect(bitmap);
         var p = e.GetPosition(this);
 
-        if (editor.SelectedSlide is { IsFull: false } selected)
+        if (editor.SelectedSlide is { IsFull: false } selected && !editor.IsLocked)
         {
             var corners = Corners(ToCanvas(selected.Rect, image));
             for (var i = 0; i < corners.Length; i++)
@@ -195,7 +229,11 @@ public sealed class CropCanvas : Control, ICustomHitTest
         if (hit is not null)
         {
             editor.SelectedSlide = hit;
-            Begin(DragMode.Move, hit, p, e);
+            if (!editor.IsLocked) Begin(DragMode.Move, hit, p, e);
+        }
+        else if (e.ClickCount == 2)
+        {
+            ResetZoom();
         }
         else if (image.Contains(p) && editor.Slides.FirstOrDefault(s => s.IsFull) is { } full)
         {
@@ -220,6 +258,14 @@ public sealed class CropCanvas : Control, ICustomHitTest
         if (editor?.Preview is not Bitmap bitmap) { Cursor = editor is null ? null : HandCursor; return; }
         var image = ImageRect(bitmap);
         var p = e.GetPosition(this);
+
+        if (_mode == DragMode.Pan)
+        {
+            _viewport.Pan(p - _panLast, Area, bitmap.Size);
+            _panLast = p;
+            InvalidateVisual();
+            return;
+        }
 
         if (_mode == DragMode.None || _dragSlide is null)
         {
@@ -264,6 +310,8 @@ public sealed class CropCanvas : Control, ICustomHitTest
 
     private Cursor? HoverCursor(EditorViewModel editor, Rect image, Point p)
     {
+        if (PanModifier && !_viewport.IsFit) return HandCursor;
+        if (editor.IsLocked) return null;
         if (editor.SelectedSlide is { IsFull: false } selected)
         {
             var corners = Corners(ToCanvas(selected.Rect, image));

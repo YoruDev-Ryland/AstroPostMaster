@@ -253,7 +253,8 @@ public sealed partial class PhoneExportViewModel : ObservableObject
             _helpTimer = _time.CreateTimer(_ => _ui.Post(() => { if (!PhoneConnected && !_closed) ShowConnectionHelp = true; }),
                 null, HelpDelay, Timeout.InfiniteTimeSpan);
         }
-        catch (Exception ex) when (ex is IOException or System.Net.Sockets.SocketException or InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or System.Net.Sockets.SocketException or InvalidOperationException
+                                       or System.Security.Cryptography.CryptographicException or UnauthorizedAccessException)
         {
             Fail($"Couldn't start the phone server: {ex.Message}");
         }

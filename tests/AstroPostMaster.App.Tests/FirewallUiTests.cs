@@ -182,3 +182,33 @@ public class FirewallUiTests
         Assert.Equal("No network connection.", vm.ConnectionStatus);
     }
 }
+
+public class HandoffStartFailureTests
+{
+    private sealed class FailingHost : IHandoffHost
+    {
+        public IReadOnlyList<IPAddress> Addresses() => [IPAddress.Parse("192.168.1.50")];
+        public Task<IHandoffSession> StartAsync(HandoffPackage p, IPAddress a, bool https, CancellationToken ct = default) =>
+            throw new System.Security.Cryptography.CryptographicException("Key not valid for use in specified state.");
+    }
+
+    [Fact]
+    public async Task CertificateFailure_IsReportedInsteadOfCrashing()
+    {
+        using var dir = new TempDir();
+        var state = Sample.State(dir);
+        var post = PostFactory.CreateNew([.. state.Sites], [.. state.Rigs], [.. state.Software], [.. state.HashtagSets]);
+        var source = dir.File("src.jpg");
+        using (var bmp = new SKBitmap(600, 400))
+        using (var data = bmp.Encode(SKEncodedImageFormat.Jpeg, 90))
+            File.WriteAllBytes(source, data.ToArray());
+        var editor = new EditorViewModel(post, state, new FakePreviewLoader(600, 400), new ImmediateDispatcher()) { SaveDelay = TimeSpan.Zero };
+        await editor.SetSourceAsync(source);
+        var vm = new PhoneExportViewModel(editor, state, new ImmediateDispatcher(), new FailingHost(), new FakeTimeProvider());
+
+        await vm.StartAsync();
+
+        Assert.True(vm.HasError);
+        Assert.Contains("phone server", vm.Status);
+    }
+}

@@ -34,13 +34,19 @@ public static class HandoffCertificate
             }
         }
 
-        var created = Create(wanted, now);
+        var (created, pfx) = CreateWithPfx(wanted, now);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(pfxPath))!);
-        File.WriteAllBytes(pfxPath, created.Export(X509ContentType.Pfx));
+        File.WriteAllBytes(pfxPath, pfx);
         return created;
     }
 
-    internal static X509Certificate2 Create(IReadOnlyList<IPAddress> addresses, DateTimeOffset now)
+    internal static X509Certificate2 Create(IReadOnlyList<IPAddress> addresses, DateTimeOffset now) => CreateWithPfx(addresses, now).Certificate;
+
+    /// <summary>
+    /// Creates the certificate and its PFX bytes in one go. The PFX must come from the freshly generated key:
+    /// Windows and macOS mark a key loaded from a PFX as non-exportable, so exporting a second time fails there.
+    /// </summary>
+    private static (X509Certificate2 Certificate, byte[] Pfx) CreateWithPfx(IReadOnlyList<IPAddress> addresses, DateTimeOffset now)
     {
         using var rsa = RSA.Create(2048);
         var request = new CertificateRequest("CN=AstroPostMaster", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -54,7 +60,8 @@ public static class HandoffCertificate
 
         using var cert = request.CreateSelfSigned(now.AddDays(-1), now + Validity);
         // Round-trip through PFX so the private key is usable by SslStream on every OS.
-        return X509CertificateLoader.LoadPkcs12(cert.Export(X509ContentType.Pfx), null);
+        var pfx = cert.Export(X509ContentType.Pfx);
+        return (X509CertificateLoader.LoadPkcs12(pfx, null), pfx);
     }
 
     private static bool Covers(X509Certificate2 cert, IReadOnlyList<IPAddress> addresses)

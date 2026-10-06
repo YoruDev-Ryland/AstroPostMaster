@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>AstroPostMaster</AssemblyName>
+    <RootNamespace>AstroPostMaster.App</RootNamespace>
+    <Version>0.1.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon />
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AstroPostMaster.Core/AstroPostMaster.Core.csproj" />
+    <ProjectReference Include="../AstroPostMaster.Imaging/AstroPostMaster.Imaging.csproj" />
+    <ProjectReference Include="../AstroPostMaster.Handoff/AstroPostMaster.Handoff.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AstroPostMaster.App.Tests" />
+    <InternalsVisibleTo Include="AstroPostMaster.Screenshots" />
+  </ItemGroup>
+</Project>

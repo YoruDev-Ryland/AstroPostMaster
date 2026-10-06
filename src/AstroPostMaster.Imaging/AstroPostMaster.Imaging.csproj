@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <PackageReference Include="BitMiracle.LibTiff.NET" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AstroPostMaster.Core/AstroPostMaster.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AstroPostMaster.Imaging.Tests" />
+  </ItemGroup>
+</Project>

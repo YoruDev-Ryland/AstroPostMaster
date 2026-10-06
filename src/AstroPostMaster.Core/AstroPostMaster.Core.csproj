@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="AstroPostMaster.Core.Tests" />
+    <EmbeddedResource Include="Catalog/catalog.json" LogicalName="AstroPostMaster.Core.catalog.json" />
+  </ItemGroup>
+</Project>

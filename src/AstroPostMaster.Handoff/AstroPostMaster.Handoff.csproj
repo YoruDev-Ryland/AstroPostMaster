@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="QRCoder" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="PhonePage/phone.html" LogicalName="AstroPostMaster.Handoff.phone.html" />
+    <InternalsVisibleTo Include="AstroPostMaster.Handoff.Tests" />
+  </ItemGroup>
+</Project>

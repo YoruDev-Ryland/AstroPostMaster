@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AstroPostMaster.App.ViewModels"
+             xmlns:views="using:AstroPostMaster.App.Views"
+             xmlns:sys="using:System"
+             x:Class="AstroPostMaster.App.Views.Filmstrip"
+             x:DataType="vm:EditorViewModel">
+  <Border Classes="panel" BorderThickness="0,1,0,0">
+    <DockPanel Margin="12,10">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="12,0,0,0">
+        <Button ToolTip.Tip="Add a slide">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Path Classes="icon" Data="{StaticResource IconPlus}" />
+            <TextBlock Text="Slide" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button.Flyout>
+            <MenuFlyout Placement="TopEdgeAlignedRight">
+              <MenuItem Header="Crop" InputGesture="C" Command="{Binding AddCropCommand}" />
+              <MenuItem Header="Panorama · 2 slides" Command="{Binding AddPanoramaCommand}">
+                <MenuItem.CommandParameter><sys:Int32>2</sys:Int32></MenuItem.CommandParameter>
+              </MenuItem>
+              <MenuItem Header="Panorama · 3 slides" InputGesture="P" Command="{Binding AddPanoramaCommand}">
+                <MenuItem.CommandParameter><sys:Int32>3</sys:Int32></MenuItem.CommandParameter>
+              </MenuItem>
+              <MenuItem Header="Panorama · 4 slides" Command="{Binding AddPanoramaCommand}">
+                <MenuItem.CommandParameter><sys:Int32>4</sys:Int32></MenuItem.CommandParameter>
+              </MenuItem>
+              <MenuItem Header="Panorama · 5 slides" Command="{Binding AddPanoramaCommand}">
+                <MenuItem.CommandParameter><sys:Int32>5</sys:Int32></MenuItem.CommandParameter>
+              </MenuItem>
+              <Separator />
+              <MenuItem Header="Full image" Command="{Binding AddFullImageCommand}" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+        <Button Classes="icon" ToolTip.Tip="Remove selected slide (Del)" Command="{Binding RemoveSelectedSlideCommand}">
+          <Path Classes="icon" Data="{StaticResource IconTrash}" />
+        </Button>
+      </StackPanel>
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ItemsControl x:Name="Strip" ItemsSource="{Binding Slides}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="8" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SlideViewModel">
+              <Border Classes="thumb" Classes.selected="{Binding IsSelected}"
+                      Width="{Binding ThumbWidth}" Height="88" ClipToBounds="True">
+                <Panel>
+                  <Image Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Image.Source>
+                      <MultiBinding Converter="{x:Static views:ThumbnailConverter.Instance}">
+                        <Binding Path="$parent[views:Filmstrip].((vm:EditorViewModel)DataContext).Preview" />
+                        <Binding Path="Rect" />
+                        <Binding Path="Kind" />
+                      </MultiBinding>
+                    </Image.Source>
+                  </Image>
+                  <Border Classes="badge">
+                    <TextBlock Text="{Binding Label}" />
+                  </Border>
+                </Panel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

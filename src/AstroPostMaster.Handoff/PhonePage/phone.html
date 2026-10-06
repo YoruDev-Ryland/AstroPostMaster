@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>AstroPostMaster</title>
+<style>
+  :root { --bg:#161616; --panel:#1E1E1E; --input:#2A2A2A; --line:#333333; --text:#E6E6E6; --muted:#9A9A9A; --accent:#C8963E; --on-accent:#161616; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); max-width: 640px; margin-inline: auto; }
+  h1 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0 0 12px; }
+  .actions { display: grid; gap: 8px; margin-bottom: 12px; }
+  button { width: 100%; min-height: 52px; font: inherit; font-weight: 600; border-radius: 4px; border: 1px solid var(--line);
+           background: var(--input); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .status { min-height: 20px; color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .hint { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 16px; }
+  .thumbs figure { margin: 0; position: relative; }
+  .thumbs img { width: 100%; display: block; border-radius: 2px; background: var(--panel); }
+  .thumbs figcaption { position: absolute; top: 4px; left: 4px; font: 600 12px ui-monospace, Menlo, monospace;
+                       background: rgba(0,0,0,.65); padding: 1px 5px; border-radius: 2px; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+        padding: 12px; font: 14px/1.45 ui-monospace, Menlo, monospace; margin: 0; user-select: text; -webkit-user-select: text; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <h1 id="title">AstroPostMaster</h1>
+  <div class="actions">
+    <button id="copy" class="primary" type="button">Copy caption</button>
+    <button id="share" type="button" hidden>Share images</button>
+    <button id="save" type="button" hidden>Save all images</button>
+  </div>
+  <p class="status" id="status" role="status"></p>
+  <p class="hint" id="ios-hint" hidden>Press and hold each image → Save to Photos, starting with 01.</p>
+  <div class="thumbs" id="thumbs"></div>
+  <pre id="caption"></pre>
+<script>
+(async function () {
+  const $ = id => document.getElementById(id);
+  const status = msg => { $("status").textContent = msg; };
+
+  const manifest = await (await fetch("manifest.json", { cache: "no-store" })).json();
+  document.title = manifest.title + " · AstroPostMaster";
+  $("title").textContent = manifest.title;
+  $("caption").textContent = manifest.caption;
+  manifest.images.forEach((name, i) => {
+    const fig = document.createElement("figure");
+    const img = document.createElement("img");
+    img.src = "img/" + i;
+    img.alt = name;
+    const label = document.createElement("figcaption");
+    label.textContent = String(i + 1).padStart(2, "0");
+    fig.append(img, label);
+    $("thumbs").append(fig);
+  });
+
+  function legacyCopy(text) {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    area.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    area.remove();
+    return ok;
+  }
+
+  $("copy").addEventListener("click", async () => {
+    let ok = false;
+    if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+      try { await navigator.clipboard.writeText(manifest.caption); ok = true; } catch (e) { ok = false; }
+    }
+    if (!ok) ok = legacyCopy(manifest.caption);
+    status(ok ? "Caption copied." : "Press and hold the caption to copy it.");
+  });
+
+  // Fetch the files up front: iOS only allows navigator.share() synchronously inside the tap handler.
+  let files = null;
+  try {
+    files = await Promise.all(manifest.images.map((name, i) =>
+      fetch("img/" + i).then(r => r.blob()).then(b => new File([b], name, { type: "image/jpeg" }))));
+  } catch (e) {
+    files = null;
+  }
+  const canShareFiles = !!(files && navigator.canShare && navigator.canShare({ files }));
+  const isIos = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  if (canShareFiles) {
+    $("share").hidden = false;
+    $("share").addEventListener("click", () => {
+      navigator.share({ files })
+        .then(() => status("Shared."))
+        .catch(e => { if (e.name !== "AbortError") status("Sharing failed: " + e.message); });
+    });
+  } else if (isIos) {
+    $("ios-hint").hidden = false;
+  } else {
+    $("save").hidden = false;
+    $("save").addEventListener("click", () => {
+      manifest.images.forEach((name, i) => setTimeout(() => {
+        const a = document.createElement("a");
+        a.href = "img/" + i;
+        a.download = name;
+        document.body.append(a);
+        a.click();
+        a.remove();
+      }, i * 400));
+      status("Downloading " + manifest.images.length + " images…");
+    });
+  }
+})().catch(e => { document.getElementById("status").textContent = "Couldn't load this post: " + e.message; });
+</script>
+</body>
+</html>

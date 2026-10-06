@@ -1,0 +1,18 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Monochrome line icons on a 24×24 grid, drawn with a 1.75 px stroke by the IconPath style. -->
+  <StreamGeometry x:Key="IconPlus">M12 5 L12 19 M5 12 L19 12</StreamGeometry>
+  <StreamGeometry x:Key="IconTrash">M4 7 L20 7 M10 3 L14 3 M6 7 L7 20 L17 20 L18 7 M10 11 L10 16 M14 11 L14 16</StreamGeometry>
+  <StreamGeometry x:Key="IconCopy">M9 9 L20 9 L20 20 L9 20 Z M5 15 L4 15 L4 4 L15 4 L15 5</StreamGeometry>
+  <StreamGeometry x:Key="IconCrop">M6 2 L6 18 L22 18 M2 6 L18 6 L18 22</StreamGeometry>
+  <StreamGeometry x:Key="IconPanorama">M2 7 L22 7 L22 17 L2 17 Z M8.67 7 L8.67 17 M15.33 7 L15.33 17</StreamGeometry>
+  <StreamGeometry x:Key="IconPhone">M7 2 L17 2 L17 22 L7 22 Z M11 18.5 L13 18.5</StreamGeometry>
+  <StreamGeometry x:Key="IconFolder">M3 6 L9 6 L11 8 L21 8 L21 19 L3 19 Z</StreamGeometry>
+  <StreamGeometry x:Key="IconSettings">M4 6 L20 6 M4 12 L20 12 M4 18 L20 18 M8 4 L8 8 M15 10 L15 14 M10 16 L10 20</StreamGeometry>
+  <StreamGeometry x:Key="IconImage">M3 4 L21 4 L21 20 L3 20 Z M3 16 L9 11 L14 15 L17 13 L21 16 M15.5 8.5 L16.5 8.5</StreamGeometry>
+  <StreamGeometry x:Key="IconChevronLeft">M15 5 L8 12 L15 19</StreamGeometry>
+  <StreamGeometry x:Key="IconChevronRight">M9 5 L16 12 L9 19</StreamGeometry>
+  <StreamGeometry x:Key="IconSidebar">M3 4 L21 4 L21 20 L3 20 Z M9 4 L9 20</StreamGeometry>
+  <StreamGeometry x:Key="IconSend">M4 12 L20 4 L14 20 L11 13 Z M11 13 L20 4</StreamGeometry>
+  <StreamGeometry x:Key="IconDuplicate">M8 8 L20 8 L20 20 L8 20 Z M14 11 L14 17 M11 14 L17 14 M4 16 L4 4 L16 4</StreamGeometry>
+</ResourceDictionary>

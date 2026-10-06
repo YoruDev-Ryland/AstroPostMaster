@@ -1,0 +1,28 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AstroPostMaster.App.App"
+             RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://AstroPostMaster/Themes/Palette.axaml" />
+        <ResourceInclude Source="avares://AstroPostMaster/Themes/Icons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Dark" Accent="#8C8C8C" RegionColor="#161616" ErrorText="#C0584F"
+                               BaseHigh="#E6E6E6" BaseMediumHigh="#C8C8C8" BaseMedium="#9A9A9A" BaseLow="#333333"
+                               ChromeMediumLow="#1E1E1E" ChromeMedium="#2A2A2A" ChromeLow="#1E1E1E" ChromeHigh="#3A3A3A"
+                               AltHigh="#161616" AltMediumHigh="#1E1E1E" ListLow="#242424" ListMedium="#2E2E2E" />
+        <ColorPaletteResources x:Key="Light" Accent="#6E6A64" RegionColor="#F4F3F1" ErrorText="#A8443C"
+                               BaseHigh="#1E1E1E" BaseMedium="#66625C" BaseLow="#D0CDC8"
+                               ChromeMediumLow="#FFFFFF" ChromeMedium="#E6E4E0" ChromeLow="#FFFFFF"
+                               AltHigh="#F4F3F1" ListLow="#ECEAE6" ListMedium="#E2DFDA" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="avares://AstroPostMaster/Themes/Styles.axaml" />
+  </Application.Styles>
+</Application>

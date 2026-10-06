@@ -1,0 +1,156 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AstroPostMaster.App.ViewModels"
+             xmlns:model="using:AstroPostMaster.Core.Model"
+             x:Class="AstroPostMaster.App.Views.InspectorView"
+             x:DataType="vm:EditorViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="16,4,16,20">
+
+      <TextBlock Classes="section" Text="TARGET" />
+      <AutoCompleteBox x:Name="TargetBox" PlaceholderText="M31, Heart Nebula, Sh2-129…"
+                       Text="{Binding Caption.TargetText}" FilterMode="None" MinimumPrefixLength="1"
+                       MinimumPopulateDelay="0:0:0.08" MaxDropDownHeight="320">
+        <AutoCompleteBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:TargetSuggestion">
+            <StackPanel Margin="0,2">
+              <TextBlock Text="{Binding Display}" />
+              <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11" IsVisible="{Binding Detail.Length}" />
+            </StackPanel>
+          </DataTemplate>
+        </AutoCompleteBox.ItemTemplate>
+      </AutoCompleteBox>
+
+      <TextBlock Classes="section" Text="ACQUISITION" />
+      <TextBlock Classes="label" Text="Site" Margin="0,0,0,4" />
+      <ComboBox HorizontalAlignment="Stretch" PlaceholderText="No site"
+                ItemsSource="{Binding Caption.Sites}" SelectedItem="{Binding Caption.Site}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="model:Site">
+            <TextBlock>
+              <Run Text="{Binding Name}" />
+              <Run Text="{Binding Bortle, StringFormat=' · Bortle {0}'}" Foreground="{DynamicResource MutedBrush}" />
+            </TextBlock>
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBlock Classes="label" Text="Rig" />
+      <ComboBox HorizontalAlignment="Stretch" PlaceholderText="No rig"
+                ItemsSource="{Binding Caption.Rigs}" SelectedItem="{Binding Caption.Rig}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="model:Rig">
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBlock Classes="label" Text="Software" />
+      <ComboBox HorizontalAlignment="Stretch" PlaceholderText="No software"
+                ItemsSource="{Binding Caption.SoftwareSets}" SelectedItem="{Binding Caption.Software}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="model:SoftwareSet">
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+
+      <TextBlock Classes="section" Text="FILTERS" />
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <ItemsControl ItemsSource="{Binding Caption.BroadbandChips}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SelectableItem">
+              <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Border Width="1" Background="{DynamicResource LineBrush}" Margin="6,4" />
+        <ItemsControl ItemsSource="{Binding Caption.NarrowbandChips}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SelectableItem">
+              <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <Grid ColumnDefinitions="*,8,*" Margin="0,8,0,0">
+        <StackPanel>
+          <TextBlock Classes="label" Text="Palette" Margin="0,0,0,4" />
+          <ComboBox HorizontalAlignment="Stretch" PlaceholderText="—"
+                    ItemsSource="{Binding Caption.PaletteOptions}" SelectedItem="{Binding Caption.Palette}" />
+        </StackPanel>
+        <StackPanel Grid.Column="2">
+          <TextBlock Classes="label" Text="Shown as" Margin="0,0,0,4" />
+          <TextBox Classes="mono" Text="{Binding Caption.FilterText}" PlaceholderText="auto" />
+        </StackPanel>
+      </Grid>
+
+      <TextBlock Classes="section" Text="INTEGRATION" />
+      <TextBox Classes="mono" Text="{Binding Caption.IntegrationText}" PlaceholderText="{Binding Caption.IntegrationPlaceholder}" />
+      <Expander Header="Per-filter subs" Margin="0,8,0,0" HorizontalAlignment="Stretch">
+        <StackPanel Spacing="6">
+          <ItemsControl ItemsSource="{Binding Caption.IntegrationRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:IntegrationRowViewModel">
+                <Grid ColumnDefinitions="*,6,64,Auto,64,Auto,Auto" Margin="0,0,0,6">
+                  <TextBox Text="{Binding Filter}" PlaceholderText="Hα" />
+                  <TextBox Grid.Column="2" Classes="mono" Text="{Binding Subs}" PlaceholderText="subs" />
+                  <TextBlock Grid.Column="3" Text="×" Margin="6,0" VerticalAlignment="Center" Classes="muted" />
+                  <TextBox Grid.Column="4" Classes="mono" Text="{Binding SubSeconds}" />
+                  <TextBlock Grid.Column="5" Text="s" Margin="4,0" VerticalAlignment="Center" Classes="muted" />
+                  <Button Grid.Column="6" Classes="icon" Click="OnRemoveRow" ToolTip.Tip="Remove">
+                    <Path Classes="icon" Data="{StaticResource IconTrash}" />
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Grid ColumnDefinitions="Auto,*">
+            <Button Content="Add filter" Click="OnAddRow" />
+            <TextBlock Grid.Column="1" Classes="stat" HorizontalAlignment="Right"
+                       Text="{Binding Caption.IntegrationTotal, StringFormat='Total {0}'}" />
+          </Grid>
+        </StackPanel>
+      </Expander>
+
+      <TextBlock Classes="section" Text="NIGHTS" />
+      <TextBox Classes="mono" Text="{Binding Caption.DatesText}" PlaceholderText="2026-08-18, 2026-08-19" />
+      <TextBlock Classes="error" FontSize="12" Margin="0,4,0,0" IsVisible="{Binding Caption.DatesInvalid}"
+                 Text="Use yyyy-mm-dd; unrecognised dates are ignored." />
+
+      <TextBlock Classes="section" Text="DESCRIPTION" />
+      <TextBox Text="{Binding Caption.Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64"
+               PlaceholderText="Optional: a line about the object or the night" />
+
+      <TextBlock Classes="section" Text="HASHTAGS" />
+      <ItemsControl ItemsSource="{Binding Caption.HashtagSets}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:SelectableItem">
+            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="0,0,12,0" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBox Text="{Binding Caption.ExtraHashtagsText}" PlaceholderText="#extra #tags" Margin="0,6,0,0" />
+
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="section" Text="CAPTION" />
+        <Button Grid.Column="1" Classes="link" Click="OnCopyCaption" VerticalAlignment="Bottom" Margin="0,0,0,2">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <Path Classes="icon" Data="{StaticResource IconCopy}" Width="13" Height="13" />
+            <TextBlock Text="Copy" />
+          </StackPanel>
+        </Button>
+      </Grid>
+      <Border Classes="card">
+        <SelectableTextBlock Text="{Binding CaptionText}" TextWrapping="Wrap" LineHeight="19" />
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

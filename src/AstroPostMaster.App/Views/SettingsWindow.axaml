@@ -1,0 +1,278 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AstroPostMaster.App.ViewModels"
+        x:Class="AstroPostMaster.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings" Width="820" Height="620" MinWidth="720" MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="14,0" />
+    </Style>
+    <Style Selector="ListBox.profiles">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+  </Window.Styles>
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Classes="panel" BorderThickness="0,1,0,0" Padding="16,10">
+      <DockPanel>
+      <TextBlock x:Name="ErrorText" Classes="error" VerticalAlignment="Center" TextWrapping="Wrap" />
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Content="Cancel" Click="OnCancel" />
+        <Button Content="Save" Click="OnSave" IsDefault="True" />
+      </StackPanel>
+      </DockPanel>
+    </Border>
+    <TabControl Margin="12,4,12,0">
+
+      <!-- Profiles -->
+      <TabItem Header="Profiles">
+        <TabControl TabStripPlacement="Left" Padding="16,0,0,0">
+
+          <TabItem Header="Sites">
+            <Grid ColumnDefinitions="200,*">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="0,8">
+                  <Button Content="Add" Command="{Binding NewSiteCommand}" />
+                  <Button Content="Remove" Command="{Binding RemoveSiteCommand}" CommandParameter="{Binding SelectedSite}" />
+                </StackPanel>
+                <ListBox Classes="profiles" ItemsSource="{Binding Sites}" SelectedItem="{Binding SelectedSite}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SiteItem">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Name}" />
+                        <TextBlock Text="default" Classes="muted" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding IsDefault}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+              <StackPanel Grid.Column="1" Margin="20,0,0,0" DataContext="{Binding SelectedSite}" x:DataType="vm:SiteItem"
+                          IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Classes="label" Text="Name" />
+                <TextBox Text="{Binding Name}" PlaceholderText="SFRO" />
+                <TextBlock Classes="label" Text="Bortle class (1–9, optional)" />
+                <TextBox Text="{Binding Bortle}" Width="80" HorizontalAlignment="Left" />
+                <CheckBox Content="Default for new posts" IsChecked="{Binding IsDefault}" Margin="0,12,0,0" Click="OnSiteDefault" />
+              </StackPanel>
+            </Grid>
+          </TabItem>
+
+          <TabItem Header="Rigs">
+            <Grid ColumnDefinitions="200,*">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="0,8">
+                  <Button Content="Add" Command="{Binding NewRigCommand}" />
+                  <Button Content="Remove" Command="{Binding RemoveRigCommand}" CommandParameter="{Binding SelectedRig}" />
+                </StackPanel>
+                <ListBox Classes="profiles" ItemsSource="{Binding Rigs}" SelectedItem="{Binding SelectedRig}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RigItem">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Name}" />
+                        <TextBlock Text="default" Classes="muted" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding IsDefault}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+              <ScrollViewer Grid.Column="1" Margin="20,0,0,0">
+                <StackPanel DataContext="{Binding SelectedRig}" x:DataType="vm:RigItem"
+                            IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <TextBlock Classes="label" Text="Name" />
+                  <TextBox Text="{Binding Name}" PlaceholderText="Starlux 190" />
+                  <TextBlock Classes="label" Text="Scope" />
+                  <TextBox Text="{Binding Scope}" PlaceholderText="SkyWatcher Starlux 190mn" />
+                  <TextBlock Classes="label" Text="Camera" />
+                  <TextBox Text="{Binding Camera}" PlaceholderText="ASI2600mm Pro" />
+                  <TextBlock Classes="label" Text="Filters" />
+                  <TextBox Text="{Binding Filters}" PlaceholderText="Scorpio 3nm LRGBSHO" />
+                  <TextBlock Classes="label" Text="Mount" />
+                  <TextBox Text="{Binding Mount}" PlaceholderText="ZWO AM5" />
+                  <TextBlock Classes="label" Text="Other equipment (one per line)" />
+                  <TextBox Text="{Binding ExtraText}" AcceptsReturn="True" MinHeight="64" PlaceholderText="Guider: ASI220mm Mini" />
+                  <CheckBox Content="Default for new posts" IsChecked="{Binding IsDefault}" Margin="0,12,0,0" Click="OnRigDefault" />
+                </StackPanel>
+              </ScrollViewer>
+            </Grid>
+          </TabItem>
+
+          <TabItem Header="Software">
+            <Grid ColumnDefinitions="200,*">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="0,8">
+                  <Button Content="Add" Command="{Binding NewSoftwareCommand}" />
+                  <Button Content="Remove" Command="{Binding RemoveSoftwareCommand}" CommandParameter="{Binding SelectedSoftware}" />
+                </StackPanel>
+                <ListBox Classes="profiles" ItemsSource="{Binding Software}" SelectedItem="{Binding SelectedSoftware}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SoftwareItem">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Name}" />
+                        <TextBlock Text="default" Classes="muted" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding IsDefault}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+              <StackPanel Grid.Column="1" Margin="20,0,0,0" DataContext="{Binding SelectedSoftware}" x:DataType="vm:SoftwareItem"
+                          IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Classes="label" Text="Name" />
+                <TextBox Text="{Binding Name}" PlaceholderText="Usual workflow" />
+                <TextBlock Classes="label" Text="Lines (one per line, as they appear in the caption)" />
+                <TextBox Text="{Binding LinesText}" AcceptsReturn="True" MinHeight="140" TextWrapping="Wrap"
+                         PlaceholderText="Siril - Stacking, Mosaic Stitching&#10;Pix Insight - Astro Processing, Recomposition" />
+                <CheckBox Content="Default for new posts" IsChecked="{Binding IsDefault}" Margin="0,12,0,0" Click="OnSoftwareDefault" />
+              </StackPanel>
+            </Grid>
+          </TabItem>
+
+          <TabItem Header="Hashtags">
+            <Grid ColumnDefinitions="200,*">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="0,8">
+                  <Button Content="Add" Command="{Binding NewHashtagSetCommand}" />
+                  <Button Content="Remove" Command="{Binding RemoveHashtagSetCommand}" CommandParameter="{Binding SelectedHashtagSet}" />
+                </StackPanel>
+                <ListBox Classes="profiles" ItemsSource="{Binding HashtagSets}" SelectedItem="{Binding SelectedHashtagSet}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HashtagSetItem">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Name}" />
+                        <TextBlock Text="default" Classes="muted" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding IsDefault}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </DockPanel>
+              <StackPanel Grid.Column="1" Margin="20,0,0,0" DataContext="{Binding SelectedHashtagSet}" x:DataType="vm:HashtagSetItem"
+                          IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Classes="label" Text="Name" />
+                <TextBox Text="{Binding Name}" PlaceholderText="Core astro" />
+                <TextBlock Classes="label" Text="Tags (spaces, commas or new lines)" />
+                <TextBox Text="{Binding TagsText}" AcceptsReturn="True" MinHeight="140" TextWrapping="Wrap"
+                         PlaceholderText="#astrophotography #astronomy #deepsky" />
+                <CheckBox Content="Selected for new posts" IsChecked="{Binding IsDefault}" Margin="0,12,0,0" />
+              </StackPanel>
+            </Grid>
+          </TabItem>
+        </TabControl>
+      </TabItem>
+
+      <!-- Caption -->
+      <TabItem Header="Caption">
+        <Grid ColumnDefinitions="*,200" Margin="0,8,0,0">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,8,0,8">
+              <Button Content="Reset to default" Command="{Binding ResetTemplateCommand}" />
+              <CheckBox Content="Include moon phase for imaging nights" IsChecked="{Binding MoonLineEnabled}" />
+            </StackPanel>
+            <TextBox Text="{Binding CaptionTemplate}" AcceptsReturn="True" TextWrapping="NoWrap"
+                     FontFamily="{StaticResource MonoFont}" FontSize="13" />
+          </DockPanel>
+          <StackPanel Grid.Column="1" Margin="16,0,0,0">
+            <TextBlock Classes="label" Text="Placeholders" Margin="0,0,0,6" />
+            <ItemsControl ItemsSource="{Binding Placeholders}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <SelectableTextBlock FontFamily="{StaticResource MonoFont}" FontSize="12">
+                    <Run Text="{}{" /><Run Text="{Binding}" /><Run Text="}" />
+                  </SelectableTextBlock>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Grid>
+      </TabItem>
+
+      <!-- Export -->
+      <TabItem Header="Export">
+        <ScrollViewer>
+          <StackPanel MaxWidth="560" HorizontalAlignment="Left" Margin="0,8,0,16">
+            <TextBlock Classes="section" Text="SLIDE SIZE" />
+            <ComboBox ItemsSource="{x:Static vm:SettingsViewModel.ExportSizeOptions}" SelectedIndex="{Binding ExportSizeIndex}" Width="260">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ExportSizeOption">
+                  <StackPanel Spacing="1">
+                    <TextBlock Text="{Binding Label}" />
+                    <TextBlock Text="{Binding Hint}" Classes="muted" FontSize="11" />
+                  </StackPanel>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+              <ComboBox.SelectionBoxItemTemplate>
+                <DataTemplate x:DataType="vm:ExportSizeOption">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.SelectionBoxItemTemplate>
+            </ComboBox>
+
+            <TextBlock Classes="section" Text="JPEG QUALITY" />
+            <Grid ColumnDefinitions="*,48">
+              <Slider Minimum="60" Maximum="100" Value="{Binding JpegQuality}" TickFrequency="1" IsSnapToTickEnabled="True" />
+              <TextBlock Grid.Column="1" Classes="stat" HorizontalAlignment="Right" Text="{Binding JpegQuality}" />
+            </Grid>
+
+            <TextBlock Classes="section" Text="WATERMARK" />
+            <CheckBox Content="Add a signature to every slide" IsChecked="{Binding WatermarkEnabled}" />
+            <StackPanel IsEnabled="{Binding WatermarkEnabled}">
+              <TextBlock Classes="label" Text="Text" />
+              <TextBox Text="{Binding WatermarkText}" PlaceholderText="@yourhandle" />
+              <TextBlock Classes="label" Text="Corner" />
+              <ComboBox ItemsSource="{Binding Corners}" SelectedItem="{Binding WatermarkCorner}" Width="200" />
+              <TextBlock Classes="label" Text="Size (% of slide height)" />
+              <Grid ColumnDefinitions="*,48">
+                <Slider Minimum="1" Maximum="10" Value="{Binding WatermarkSizePercent}" />
+                <TextBlock Grid.Column="1" Classes="stat" HorizontalAlignment="Right" Text="{Binding WatermarkSizePercent, StringFormat='{}{0:0.0}'}" />
+              </Grid>
+              <TextBlock Classes="label" Text="Opacity (%)" />
+              <Grid ColumnDefinitions="*,48">
+                <Slider Minimum="0" Maximum="100" Value="{Binding WatermarkOpacityPercent}" />
+                <TextBlock Grid.Column="1" Classes="stat" HorizontalAlignment="Right" Text="{Binding WatermarkOpacityPercent, StringFormat='{}{0:0}'}" />
+              </Grid>
+            </StackPanel>
+
+            <TextBlock Classes="section" Text="PHONE" />
+            <CheckBox Content="Use a secure (HTTPS) link" IsChecked="{Binding UseHttps}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0" IsVisible="{Binding CanCheckConnection}">
+              <Button Content="Check phone connection" Click="OnCheckConnection" IsEnabled="{Binding !IsCheckingConnection}" />
+              <Button Content="Allow on my home network" Click="OnFixConnection" IsVisible="{Binding CanFixConnection}"
+                      IsEnabled="{Binding !IsCheckingConnection}" />
+            </StackPanel>
+            <TextBlock Text="{Binding ConnectionStatus}" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"
+                       IsVisible="{Binding ConnectionStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <TextBlock Classes="section" Text="FILES" />
+            <TextBlock Classes="label" Text="Folder the Open dialog starts in" Margin="0,0,0,4" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Text="{Binding DefaultBrowseFolder}" PlaceholderText="~/Pictures/Astrophotography" />
+              <Button Grid.Column="1" Content="Browse…" Click="OnBrowseFolder" Margin="8,0,0,0" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Appearance -->
+      <TabItem Header="Appearance">
+        <StackPanel Margin="0,8,0,0">
+          <TextBlock Classes="section" Text="THEME" />
+          <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" Width="200" />
+        </StackPanel>
+      </TabItem>
+
+      <!-- About -->
+      <TabItem Header="About">
+        <StackPanel Margin="0,16,0,0" Spacing="8" MaxWidth="560" HorizontalAlignment="Left">
+          <TextBlock Classes="title" Text="AstroPostMaster" />
+          <TextBlock Classes="muted" Text="{Binding Version, StringFormat='Version {0}'}" />
+          <Button Classes="link" Padding="0" Margin="0,8,0,0" Click="OnKoFi" HorizontalAlignment="Left">
+            <TextBlock Text="Support AstroPostMaster on Ko-fi →" TextDecorations="Underline" />
+          </Button>
+          <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,16,0,0"
+                     Text="Target catalog derived from OpenNGC by Mattia Verga (CC-BY-SA-4.0), github.com/mattiaverga/OpenNGC." />
+        </StackPanel>
+      </TabItem>
+    </TabControl>
+  </DockPanel>
+</Window>

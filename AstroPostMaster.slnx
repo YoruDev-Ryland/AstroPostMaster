@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AstroPostMaster.App/AstroPostMaster.App.csproj" />
+    <Project Path="src/AstroPostMaster.Core/AstroPostMaster.Core.csproj" />
+    <Project Path="src/AstroPostMaster.Handoff/AstroPostMaster.Handoff.csproj" />
+    <Project Path="src/AstroPostMaster.Imaging/AstroPostMaster.Imaging.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AstroPostMaster.App.Tests/AstroPostMaster.App.Tests.csproj" />
+    <Project Path="tests/AstroPostMaster.Core.Tests/AstroPostMaster.Core.Tests.csproj" />
+    <Project Path="tests/AstroPostMaster.Handoff.Tests/AstroPostMaster.Handoff.Tests.csproj" />
+    <Project Path="tests/AstroPostMaster.Imaging.Tests/AstroPostMaster.Imaging.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/AstroPostMaster.Screenshots/AstroPostMaster.Screenshots.csproj" />
+  </Folder>
+</Solution>

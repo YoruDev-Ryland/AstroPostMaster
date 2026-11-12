@@ -21,7 +21,7 @@ public static class PostExporter
 
         var (sourceWidth, sourceHeight) = ImageLoader.ReadSize(post.SourcePath);
         var size = post.ExportSize ?? settings.ExportSize;
-        var scale = SlideGeometry.RequiredScale(post.Slides, post.Aspect, sourceWidth, sourceHeight, size);
+        var scale = SlideGeometry.RequiredScale(post, sourceWidth, sourceHeight, size);
         var total = PostValidator.SlideCount(post);
         var fullExportDir = Path.GetFullPath(exportDir);
         var parent = Path.GetDirectoryName(fullExportDir)!;
@@ -36,7 +36,7 @@ public static class PostExporter
             foreach (var slide in post.Slides)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var bitmaps = SlideRenderer.Render(source, slide, post.Aspect, settings.Watermark, size);
+                var bitmaps = SlideRenderer.Render(source, post, slide, settings.Watermark, size);
                 try
                 {
                     foreach (var bitmap in bitmaps)

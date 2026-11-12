@@ -49,15 +49,8 @@
               <Border Classes="thumb" Classes.selected="{Binding IsSelected}"
                       Width="{Binding ThumbWidth}" Height="88" ClipToBounds="True">
                 <Panel>
-                  <Image Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Image.Source>
-                      <MultiBinding Converter="{x:Static views:ThumbnailConverter.Instance}">
-                        <Binding Path="$parent[views:Filmstrip].((vm:EditorViewModel)DataContext).Preview" />
-                        <Binding Path="Rect" />
-                        <Binding Path="Kind" />
-                      </MultiBinding>
-                    </Image.Source>
-                  </Image>
+                  <views:SlideImage Source="{Binding $parent[views:Filmstrip].((vm:EditorViewModel)DataContext).Preview}"
+                                    Rect="{Binding Rect}" Angle="{Binding Angle}" Kind="{Binding Kind}" />
                   <Border Classes="badge">
                     <TextBlock Text="{Binding Label}" />
                   </Border>

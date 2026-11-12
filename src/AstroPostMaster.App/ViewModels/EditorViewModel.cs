@@ -46,8 +46,50 @@ public sealed partial class EditorViewModel : ObservableObject
 
     public int AspectIndex
     {
-        get => AspectSizes.All.ToList().IndexOf(Aspect);
-        set { if (value >= 0 && value < AspectSizes.All.Count) Aspect = AspectSizes.All[value]; }
+        get => AspectOption.IndexOf(Aspect);
+        set { if (value >= 0 && value < AspectOption.All.Count) Aspect = AspectOption.All[value].Aspect; }
+    }
+
+    public bool IsCustomAspect => Aspect == AspectRatio.Custom;
+    public bool IsFreeAspect => Aspect == AspectRatio.Free;
+
+    /// <summary>The custom ratio as typed ("5:4", "1.25"). Unparseable input is rejected and the old value shown again.</summary>
+    public string CustomAspectText
+    {
+        get => PostShape.CustomLabel(Post.CustomAspectWidth, Post.CustomAspectHeight);
+        set
+        {
+            if (IsLocked || !PostShape.TryParse(value, out var w, out var h)
+                || (w == Post.CustomAspectWidth && h == Post.CustomAspectHeight))
+            {
+                OnPropertyChanged();
+                return;
+            }
+            Post.CustomAspectWidth = w;
+            Post.CustomAspectHeight = h;
+            ShapeChanged();
+        }
+    }
+
+    /// <summary>Width ÷ height of one exported slide (one panel), following the post's shape.</summary>
+    public double SlideRatio(SlideViewModel slide) =>
+        PostShape.FixedRatio(Post) ?? (HasSource ? PostShape.FreeSlideRatio(slide.Model, SourceWidth, SourceHeight) : PostShape.DefaultFreeRatio);
+
+    /// <summary>Ratio for a whole frame of <paramref name="slide"/>, or null when frames are free.</summary>
+    public double? FrameRatio(SlideViewModel slide) => PostShape.FixedFrameRatio(Post, slide.Model);
+
+    public bool CanRotate => SelectedSlide is { CanRotate: true } && !IsLocked;
+
+    /// <summary>The selected frame's rotation in degrees (clockwise), for the toolbar box.</summary>
+    public decimal? SelectedAngle
+    {
+        get => SelectedSlide is { CanRotate: true } s ? Math.Round((decimal)s.Angle, 2) : null;
+        set
+        {
+            if (value is not { } v || SelectedSlide is not { CanRotate: true } slide) { OnPropertyChanged(); return; }
+            RotateFrame(slide, (double)v, slide.Rect);
+            OnPropertyChanged();
+        }
     }
 
     /// <summary>The post's own size if set, else the Settings default.</summary>
@@ -113,7 +155,7 @@ public sealed partial class EditorViewModel : ObservableObject
     public bool TooManyHashtags => HashtagCount > Hashtags.InstagramLimit;
     public bool TooLong => CharacterCount > CaptionStats.MaxCharacters;
     public bool TooManySlides => SlideCount > PostValidator.MaxSlides;
-    public string AspectLabel => AspectSizes.Label(Aspect);
+    public string AspectLabel => PostShape.Label(Post);
 
     public string Title
     {
@@ -137,6 +179,7 @@ public sealed partial class EditorViewModel : ObservableObject
             if (Post.IsLocked == value) return;
             Post.IsLocked = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(CanRotate));
             FramesChanged?.Invoke();
             Changed();
         }
@@ -149,21 +192,46 @@ public sealed partial class EditorViewModel : ObservableObject
         {
             if (Post.Aspect == value) return;
             if (IsLocked) { OnPropertyChanged(); OnPropertyChanged(nameof(AspectIndex)); return; }
+            // Start a custom shape from the current one, so switching to Custom moves nothing.
+            if (value == AspectRatio.Custom && Post.Aspect != AspectRatio.Custom)
+            {
+                if (Post.Aspect != AspectRatio.Free && PostShape.TryParse(AspectSizes.Label(Post.Aspect), out var w, out var h))
+                    (Post.CustomAspectWidth, Post.CustomAspectHeight) = (w, h);
+                else if (FreeShapeToCopy() is { } r)
+                    (Post.CustomAspectWidth, Post.CustomAspectHeight) = (Math.Round(r, 2), 1);
+            }
             Post.Aspect = value;
-            Refit();
             OnPropertyChanged();
-            OnPropertyChanged(nameof(AspectLabel));
             OnPropertyChanged(nameof(AspectIndex));
-            Renumber();
-            FramesChanged?.Invoke();
-            Changed();
+            OnPropertyChanged(nameof(IsCustomAspect));
+            OnPropertyChanged(nameof(IsFreeAspect));
+            ShapeChanged();
         }
+    }
+
+    private void ShapeChanged()
+    {
+        Refit();
+        OnPropertyChanged(nameof(AspectLabel));
+        OnPropertyChanged(nameof(CustomAspectText));
+        Renumber();
+        FramesChanged?.Invoke();
+        Changed();
+    }
+
+    /// <summary>In a free post, new frames copy the selected (or last) frame's shape.</summary>
+    private double? FreeShapeToCopy()
+    {
+        var source = SelectedSlide is { IsFull: false } selected ? selected : Slides.LastOrDefault(s => !s.IsFull);
+        return source is null || !HasSource ? null : PostShape.FreeSlideRatio(source.Model, SourceWidth, SourceHeight);
     }
 
     partial void OnSelectedSlideChanged(SlideViewModel? oldValue, SlideViewModel? newValue)
     {
         if (oldValue is not null) oldValue.IsSelected = false;
         if (newValue is not null) newValue.IsSelected = true;
+        OnPropertyChanged(nameof(CanRotate));
+        OnPropertyChanged(nameof(SelectedAngle));
         FramesChanged?.Invoke();
     }
 
@@ -231,6 +299,7 @@ public sealed partial class EditorViewModel : ObservableObject
         if (!ReferenceEquals(old, result.Image)) _ui.Post(() => (old as IDisposable)?.Dispose());
         SourceWidth = result.SourceWidth;
         SourceHeight = result.SourceHeight;
+        Renumber(); // free frames' thumbnail shapes depend on the image size
         SourceMissing = false;
         LoadError = null;
         _sourceLoaded = true;
@@ -246,7 +315,7 @@ public sealed partial class EditorViewModel : ObservableObject
     private void AddCrop()
     {
         if (!HasSource || IsLocked) return;
-        Insert(new Slide(SlideKind.Crop, SlideGeometry.DefaultCrop(Aspect, SourceWidth, SourceHeight)));
+        Insert(new Slide(SlideKind.Crop, SlideGeometry.DefaultCrop(NewSlideRatio(), SourceWidth, SourceHeight)));
     }
 
     [RelayCommand]
@@ -254,8 +323,10 @@ public sealed partial class EditorViewModel : ObservableObject
     {
         if (!HasSource || IsLocked) return;
         panels = Math.Clamp(panels, 2, 5);
-        Insert(new Slide(SlideKind.Panorama, SlideGeometry.DefaultPanorama(Aspect, panels, SourceWidth, SourceHeight), panels));
+        Insert(new Slide(SlideKind.Panorama, SlideGeometry.DefaultPanorama(NewSlideRatio(), panels, SourceWidth, SourceHeight), panels));
     }
+
+    private double NewSlideRatio() => PostShape.FixedRatio(Post) ?? FreeShapeToCopy() ?? PostShape.DefaultFreeRatio;
 
     [RelayCommand]
     private void AddFullImage()
@@ -284,13 +355,30 @@ public sealed partial class EditorViewModel : ObservableObject
         SlidesChanged();
     }
 
-    /// <summary>Applies a proposed frame (from dragging) after locking its ratio and clamping it inside the image.</summary>
+    /// <summary>
+    /// Applies a proposed frame (from dragging) after locking its ratio (unless the post is free) and keeping it,
+    /// rotated, inside the image.
+    /// </summary>
     public void UpdateFrame(SlideViewModel slide, RectF proposed)
     {
         if (slide.IsFull || !HasSource || IsLocked) return;
-        var fitted = SlideGeometry.FitLocked(proposed, SlideGeometry.FrameRatio(Aspect, slide.Panels), SourceWidth, SourceHeight);
+        var fitted = SlideGeometry.Fit(proposed, FrameRatio(slide), SourceWidth, SourceHeight, slide.Angle);
         if (fitted == slide.Rect) return;
         slide.Model = slide.Model with { Rect = fitted };
+        SlidesChanged();
+    }
+
+    /// <summary>
+    /// Rotates a frame to <paramref name="angle"/> degrees. The frame is fitted from <paramref name="baseRect"/>
+    /// (its rect when the drag began), so turning back restores a frame that had to shrink.
+    /// </summary>
+    public void RotateFrame(SlideViewModel slide, double angle, RectF baseRect)
+    {
+        if (slide.IsFull || !HasSource || IsLocked) return;
+        angle = SlideGeometry.NormalizeAngle(angle);
+        var fitted = SlideGeometry.Fit(baseRect, FrameRatio(slide), SourceWidth, SourceHeight, angle);
+        if (fitted == slide.Rect && angle == slide.Angle) return;
+        slide.Model = slide.Model with { Rect = fitted, Angle = angle };
         SlidesChanged();
     }
 
@@ -310,7 +398,7 @@ public sealed partial class EditorViewModel : ObservableObject
         var changed = false;
         foreach (var slide in Slides.Where(s => !s.IsFull))
         {
-            var fitted = SlideGeometry.FitLocked(slide.Rect, SlideGeometry.FrameRatio(Aspect, slide.Panels), SourceWidth, SourceHeight);
+            var fitted = SlideGeometry.Fit(slide.Rect, FrameRatio(slide), SourceWidth, SourceHeight, slide.Angle);
             if (Same(fitted, slide.Rect)) continue;
             slide.Model = slide.Model with { Rect = fitted };
             changed = true;
@@ -327,6 +415,7 @@ public sealed partial class EditorViewModel : ObservableObject
         SyncModel();
         Renumber();
         FramesChanged?.Invoke();
+        OnPropertyChanged(nameof(SelectedAngle));
         OnPropertyChanged(nameof(SlideCount));
         OnPropertyChanged(nameof(TooManySlides));
         Changed();
@@ -340,7 +429,7 @@ public sealed partial class EditorViewModel : ObservableObject
         foreach (var slide in Slides)
         {
             slide.Label = slide.Panels > 1 ? $"{number}–{number + slide.Panels - 1}" : number.ToString();
-            slide.ThumbWidth = SlideViewModel.ThumbHeight * AspectSizes.Ratio(Aspect) * slide.Panels;
+            slide.ThumbWidth = Math.Clamp(SlideViewModel.ThumbHeight * SlideRatio(slide) * slide.Panels, 24, 640);
             number += slide.Panels;
         }
     }

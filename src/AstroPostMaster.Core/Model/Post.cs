@@ -4,7 +4,9 @@ using AstroPostMaster.Core.Captions;
 namespace AstroPostMaster.Core.Model;
 
 /// <summary>Slide shape. New members are appended so stored posts keep their meaning.</summary>
-public enum AspectRatio { Portrait4x5, Portrait3x4, Square, Portrait2x3, Landscape4x3, Landscape3x2, Landscape16x9, Landscape191x100 }
+/// <remarks><see cref="Custom"/> uses <see cref="Post.CustomAspectWidth"/>:<see cref="Post.CustomAspectHeight"/>;
+/// <see cref="Free"/> lets every frame keep its own shape.</remarks>
+public enum AspectRatio { Portrait4x5, Portrait3x4, Square, Portrait2x3, Landscape4x3, Landscape3x2, Landscape16x9, Landscape191x100, Custom, Free }
 
 /// <summary>Exported slide size. Full keeps every source pixel a frame covers (never upscaled, long edge ≤ 8192).</summary>
 public enum ExportSize { Full, LongEdge4096, LongEdge2048, Instagram1080 }
@@ -20,8 +22,11 @@ public readonly record struct RectF(double X, double Y, double W, double H)
     [JsonIgnore] public double CenterY => Y + H / 2;
 }
 
-/// <summary>One entry in the carousel. A panorama expands to <see cref="Panels"/> consecutive slides on export.</summary>
-public sealed record Slide(SlideKind Kind, RectF Rect, int Panels = 1)
+/// <summary>
+/// One entry in the carousel. A panorama expands to <see cref="Panels"/> consecutive slides on export.
+/// <see cref="Angle"/> rotates the frame clockwise (degrees) about its centre, in source pixels.
+/// </summary>
+public sealed record Slide(SlideKind Kind, RectF Rect, int Panels = 1, double Angle = 0)
 {
     public static Slide FullImage => new(SlideKind.Full, new RectF(0, 0, 1, 1));
 }
@@ -55,6 +60,9 @@ public sealed class Post
     public DateTimeOffset UpdatedUtc { get; set; } = DateTimeOffset.UtcNow;
     public string? SourcePath { get; set; }
     public AspectRatio Aspect { get; set; } = AspectRatio.Portrait4x5;
+    /// <summary>Width and height of the <see cref="AspectRatio.Custom"/> shape (only their ratio matters).</summary>
+    public double CustomAspectWidth { get; set; } = 4;
+    public double CustomAspectHeight { get; set; } = 5;
     /// <summary>Per-post override of <see cref="AppSettings.ExportSize"/>; null follows the setting.</summary>
     public ExportSize? ExportSize { get; set; }
     /// <summary>A locked post is read-only (slides, image, caption) until unlocked.</summary>

@@ -16,6 +16,8 @@ public sealed partial class SlideViewModel(Slide model) : ObservableObject
 
     public SlideKind Kind => Model.Kind;
     public RectF Rect => Model.Rect;
+    public double Angle => IsFull ? 0 : Model.Angle;
+    public bool CanRotate => !IsFull;
     public int Panels => Model.Kind == SlideKind.Panorama ? Math.Max(1, Model.Panels) : 1;
     public bool IsFull => Model.Kind == SlideKind.Full;
 
@@ -26,6 +28,7 @@ public sealed partial class SlideViewModel(Slide model) : ObservableObject
     {
         OnPropertyChanged(nameof(Kind));
         OnPropertyChanged(nameof(Rect));
+        OnPropertyChanged(nameof(Angle));
         OnPropertyChanged(nameof(Panels));
         OnPropertyChanged(nameof(PanelRects));
     }

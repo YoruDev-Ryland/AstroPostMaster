@@ -15,9 +15,23 @@ public static class SlideRenderer
     /// The caller disposes the returned bitmaps.
     /// </summary>
     public static IReadOnlyList<SKBitmap> Render(LoadedImage source, Slide slide, AspectRatio aspect, WatermarkSettings? watermark = null,
-        ExportSize size = ExportSize.Instagram1080)
+        ExportSize size = ExportSize.Instagram1080) =>
+        Render(source, slide, AspectSizes.Ratio(aspect), watermark, size,
+            size == ExportSize.Full ? null : SlideGeometry.FixedSize(aspect, size));
+
+    /// <summary>Renders a slide of <paramref name="post"/>, whose shape may be custom or free.</summary>
+    public static IReadOnlyList<SKBitmap> Render(LoadedImage source, Post post, Slide slide, WatermarkSettings? watermark = null,
+        ExportSize size = ExportSize.Instagram1080) =>
+        post.Aspect is AspectRatio.Custom or AspectRatio.Free
+            ? Render(source, slide, PostShape.SlideRatio(post, slide, source.SourceWidth, source.SourceHeight), watermark, size, null)
+            : Render(source, slide, post.Aspect, watermark, size);
+
+    /// <param name="ratio">One output slide's width ÷ height.</param>
+    /// <param name="fixedSize">Overrides the computed output size (preset shapes keep their exact Instagram sizes).</param>
+    private static IReadOnlyList<SKBitmap> Render(LoadedImage source, Slide slide, double ratio, WatermarkSettings? watermark,
+        ExportSize size, (int W, int H)? fixedSize)
     {
-        var (outputWidth, outputHeight) = SlideGeometry.OutputSize(slide, aspect, size, source.SourceWidth, source.SourceHeight);
+        var (outputWidth, outputHeight) = fixedSize ?? SlideGeometry.OutputSize(slide, ratio, size, source.SourceWidth, source.SourceHeight);
         var panels = slide.Kind == SlideKind.Panorama ? Math.Max(1, slide.Panels) : 1;
         var stripWidth = outputWidth * panels;
         var srgb = SKColorSpace.CreateSrgb();
@@ -28,25 +42,33 @@ public static class SlideRenderer
         {
             canvas.Clear(SKColors.Black);
             var (bw, bh) = (source.Bitmap.Width, source.Bitmap.Height);
-            SKRectI region;
-            SKRect dest;
-            if (slide.Kind == SlideKind.Full)
+            var angle = slide.Kind == SlideKind.Full ? 0 : SlideGeometry.NormalizeAngle(slide.Angle);
+            if (angle != 0)
             {
-                region = new SKRectI(0, 0, bw, bh);
-                var (x, y, w, h) = SlideGeometry.FitInside(bw, bh, stripWidth, outputHeight);
-                dest = SKRect.Create((float)x, (float)y, (float)w, (float)h);
+                DrawRotated(canvas, image, slide, ratio * panels, angle, bw, bh, stripWidth, outputHeight);
             }
             else
             {
-                // Re-fit stored frames: they may be stale (relinked source) or hand-edited off the image.
-                var fitted = SlideGeometry.FitLocked(slide.Rect, SlideGeometry.FrameRatio(aspect, panels), bw, bh);
-                var (x, y, w, h) = SlideGeometry.ToPixels(fitted, bw, bh);
-                region = SKRectI.Create(x, y, w, h);
-                dest = SKRect.Create(0, 0, stripWidth, outputHeight);
-            }
+                SKRectI region;
+                SKRect dest;
+                if (slide.Kind == SlideKind.Full)
+                {
+                    region = new SKRectI(0, 0, bw, bh);
+                    var (x, y, w, h) = SlideGeometry.FitInside(bw, bh, stripWidth, outputHeight);
+                    dest = SKRect.Create((float)x, (float)y, (float)w, (float)h);
+                }
+                else
+                {
+                    // Re-fit stored frames: they may be stale (relinked source) or hand-edited off the image.
+                    var fitted = SlideGeometry.FitLocked(slide.Rect, SlideGeometry.FrameRatio(ratio, panels), bw, bh);
+                    var (x, y, w, h) = SlideGeometry.ToPixels(fitted, bw, bh);
+                    region = SKRectI.Create(x, y, w, h);
+                    dest = SKRect.Create(0, 0, stripWidth, outputHeight);
+                }
 
-            using var reduced = Reduce(image, region, (int)Math.Ceiling(dest.Width), (int)Math.Ceiling(dest.Height));
-            canvas.DrawImage(reduced, SKRect.Create(0, 0, reduced.Width, reduced.Height), dest, Cubic);
+                using var reduced = Reduce(image, region, (int)Math.Ceiling(dest.Width), (int)Math.Ceiling(dest.Height));
+                canvas.DrawImage(reduced, SKRect.Create(0, 0, reduced.Width, reduced.Height), dest, Cubic);
+            }
         }
 
         var slides = new List<SKBitmap>(panels);
@@ -59,6 +81,41 @@ public static class SlideRenderer
             slides.Add(panel);
         }
         return slides;
+    }
+
+    /// <summary>
+    /// Draws a rotated frame into the whole strip: the frame's bounding box is cropped and reduced like an
+    /// unrotated frame, then drawn turned back by the frame's angle so the frame fills the strip upright.
+    /// </summary>
+    private static void DrawRotated(SKCanvas canvas, SKImage image, Slide slide, double frameRatio, double angle,
+        int bw, int bh, int stripWidth, int stripHeight)
+    {
+        var fitted = SlideGeometry.Fit(slide.Rect, frameRatio, bw, bh, angle);
+        var corners = SlideGeometry.Corners(fitted, angle, bw, bh);
+        var left = Math.Clamp((int)Math.Floor(corners.Min(p => p.X)), 0, bw - 1);
+        var top = Math.Clamp((int)Math.Floor(corners.Min(p => p.Y)), 0, bh - 1);
+        var right = Math.Clamp((int)Math.Ceiling(corners.Max(p => p.X)), left + 1, bw);
+        var bottom = Math.Clamp((int)Math.Ceiling(corners.Max(p => p.Y)), top + 1, bh);
+        var region = new SKRectI(left, top, right, bottom);
+
+        var frameWidth = fitted.W * bw;
+        var frameHeight = fitted.H * bh;
+        var scale = stripWidth / frameWidth; // output pixels per source pixel
+        using var reduced = Reduce(image, region,
+            (int)Math.Ceiling(region.Width * scale), (int)Math.Ceiling(region.Height * scale));
+        var reducedScale = (double)reduced.Width / region.Width; // reduced pixels per source pixel
+
+        // Map reduced pixels → strip: into source pixels, about the frame centre, unrotate, then scale to the strip.
+        canvas.Save();
+        canvas.Translate(stripWidth / 2f, stripHeight / 2f);
+        canvas.Scale((float)scale, (float)(stripHeight / frameHeight));
+        canvas.RotateDegrees((float)-angle);
+        canvas.Translate((float)(left - fitted.CenterX * bw), (float)(top - fitted.CenterY * bh));
+        canvas.Scale((float)(1 / reducedScale));
+        using var paint = new SKPaint { IsAntialias = true };
+        canvas.DrawImage(reduced, SKRect.Create(0, 0, reduced.Width, reduced.Height), SKRect.Create(0, 0, reduced.Width, reduced.Height),
+            Cubic, paint);
+        canvas.Restore();
     }
 
     /// <summary>

@@ -23,7 +23,8 @@ Nothing is uploaded anywhere. The phone fetches the finished slides and caption 
 
 **Slides**
 - Detail crops, seamless panorama splits (2 to 5 slides), and the full image, all in one carousel
-- Portrait (4:5, 3:4, 2:3), square (1:1) and landscape (4:3, 3:2, 16:9, 1.91:1) shapes
+- Portrait (4:5, 3:4, 2:3), square (1:1) and landscape (4:3, 3:2, 16:9, 1.91:1) shapes, a custom ratio you type in, or free-form frames
+- Rotate any crop or panorama to straighten or frame a target at an angle
 - Full-resolution export by default, or 4096, 2048 or 1080 px for sites that resize anyway
 - Proper sRGB conversion, so Adobe RGB and wide-gamut exports don't look washed out
 - Reads JPG, PNG and TIFF, including 16-bit TIFF and very large mosaics
@@ -78,7 +79,7 @@ Nothing is uploaded anywhere. The phone fetches the finished slides and caption 
 
 ## Download
 
-Prebuilt downloads for Windows, macOS and Linux will be on the [Releases](https://github.com/YoruDev-Ryland/AstroPostMaster/releases) page. Each one is a single self-contained file with nothing to install. Until the first release, build from source (below).
+Prebuilt downloads for Windows, macOS and Linux are on the [Releases](https://github.com/YoruDev-Ryland/AstroPostMaster/releases/latest) page. Each one is a single self-contained file with nothing to install.
 
 On Windows, SmartScreen may warn that the app is unrecognized because it isn't code-signed yet. Choose **More info**, then **Run anyway**.
 
@@ -86,7 +87,7 @@ On Windows, SmartScreen may warn that the app is unrecognized because it isn't c
 
 1. **Add your profiles.** Open Settings and add your site (with Bortle class), rig, software and a few hashtag sets. Mark the ones you use most as defaults.
 2. **Open an image.** Drag a finished image onto the window or use **Open image**. The target is filled in when it can be guessed from the file name.
-3. **Build the carousel.** Pick a shape, then add slides. Press `C` for a crop or `P` for a 3-slide panorama; more options are under **+ Slide**. Drag frames to move them, drag a corner to resize, and drag thumbnails to reorder. Scroll to zoom, drag with the right mouse button (or hold Space) to pan, and press `0` to fit again. `F5` plays the slideshow.
+3. **Build the carousel.** Pick a shape, then add slides. Press `C` for a crop or `P` for a 3-slide panorama; more options are under **+ Slide**. Drag frames to move them, drag a corner to resize, drag the knob above a frame to rotate it (Shift snaps to 5°, double-click resets), and drag thumbnails to reorder. Choose **Custom** to type a ratio such as `5:4`, or **Free** to size frames freely. Scroll to zoom, drag with the right mouse button (or hold Space) to pan, and press `0` to fit again. `F5` plays the slideshow.
 4. **Fill in the details.** Tap your filters, enter the integration time and, if you like, the nights and a short description.
 5. **Send it.** Choose a slide size next to **Export**, then **Export ▸ Send to phone** and scan the code. Copy the caption, share the images, add a song in Instagram and post.
 

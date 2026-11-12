@@ -37,6 +37,9 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.DropEvent, OnDrop);
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
+        // Enter commits the typed ratio or angle and hands the keyboard back to the canvas.
+        CustomAspectBox.KeyDown += CommitOnEnter;
+        AngleBox.KeyDown += CommitOnEnter;
         vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainWindowViewModel.Slideshow)) OnSlideshowChanged();
@@ -219,6 +222,13 @@ public partial class MainWindow : Window
             case Key.D0 or Key.NumPad0 when !typing && !ctrl: Canvas.ResetZoom(); break;
             default: return;
         }
+        e.Handled = true;
+    }
+
+    private void CommitOnEnter(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        Canvas.Focus();
         e.Handled = true;
     }
 

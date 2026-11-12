@@ -62,7 +62,7 @@
       <!-- Editor -->
       <Grid Grid.Column="1" RowDefinitions="48,*,Auto">
         <Border Classes="panel" BorderThickness="0,0,0,1">
-          <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="8,0,12,0">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="8,0,12,0">
             <Button Classes="icon" Click="OnToggleSidebar" ToolTip.Tip="Show or hide posts" VerticalAlignment="Center">
               <Path Classes="icon" Data="{StaticResource IconSidebar}" />
             </Button>
@@ -89,16 +89,31 @@
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
-            <Button Grid.Column="4" Classes="icon" Click="OnReplaceImage" VerticalAlignment="Center" Margin="0,0,4,0"
+            <TextBox Grid.Column="4" x:Name="CustomAspectBox" VerticalAlignment="Center" Margin="0,0,12,0" Width="76"
+                     FontFamily="{StaticResource MonoFont}" HorizontalContentAlignment="Center"
+                     IsVisible="{Binding Editor.IsCustomAspect, FallbackValue=False}"
+                     IsReadOnly="{Binding Editor.IsLocked, FallbackValue=False}"
+                     Text="{Binding Editor.CustomAspectText, FallbackValue='', UpdateSourceTrigger=LostFocus}"
+                     ToolTip.Tip="Width:height, e.g. 5:4 or 1.25" />
+            <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,12,0"
+                        IsVisible="{Binding Editor.SelectedSlide.CanRotate, FallbackValue=False}">
+              <Path Classes="icon" Data="{StaticResource IconRotate}" Width="14" Height="14" Stroke="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+              <NumericUpDown x:Name="AngleBox" Width="76" ShowButtonSpinner="False" Increment="0.5" Minimum="-180" Maximum="180"
+                             FormatString="0.##°" FontFamily="{StaticResource MonoFont}" HorizontalContentAlignment="Center"
+                             IsEnabled="{Binding Editor.CanRotate, FallbackValue=False}"
+                             Value="{Binding Editor.SelectedAngle, FallbackValue={x:Null}}"
+                             ToolTip.Tip="Rotation (↑/↓ in 0.5° steps; drag the knob above the frame)" />
+            </StackPanel>
+            <Button Grid.Column="6" Classes="icon" Click="OnReplaceImage" VerticalAlignment="Center" Margin="0,0,4,0"
                     ToolTip.Tip="Replace image, keep the slides" IsVisible="{Binding Editor.HasSource, FallbackValue=False}"
                     IsEnabled="{Binding !Editor.IsLocked, FallbackValue=False}">
               <Path Classes="icon" Data="{StaticResource IconReplace}" />
             </Button>
-            <Button Grid.Column="5" Classes="icon" Command="{Binding StartSlideshowCommand}" VerticalAlignment="Center" Margin="0,0,8,0"
+            <Button Grid.Column="7" Classes="icon" Command="{Binding StartSlideshowCommand}" VerticalAlignment="Center" Margin="0,0,8,0"
                     ToolTip.Tip="Slideshow (F5)" IsVisible="{Binding Editor.HasSource, FallbackValue=False}">
               <Path Classes="icon" Data="{StaticResource IconPlay}" />
             </Button>
-            <Button Grid.Column="6" Click="OnOpenImage" VerticalAlignment="Center" ToolTip.Tip="Open an image (Ctrl+O)">
+            <Button Grid.Column="8" Click="OnOpenImage" VerticalAlignment="Center" ToolTip.Tip="Open an image (Ctrl+O)">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <Path Classes="icon" Data="{StaticResource IconImage}" />
                 <TextBlock Text="Open image" VerticalAlignment="Center" />
@@ -184,15 +199,9 @@
       <Panel DataContext="{Binding Slideshow}" x:DataType="vm:SlideshowViewModel">
         <Viewbox Margin="32" Stretch="Uniform">
           <Border Width="{Binding FrameWidth}" Height="{Binding FrameHeight}" Background="Black">
-            <Image x:Name="SlideshowImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <Image.Source>
-                <MultiBinding Converter="{x:Static views:ThumbnailConverter.Instance}">
-                  <Binding Path="Preview" />
-                  <Binding Path="Current.Rect" />
-                  <Binding Path="Current.Kind" />
-                </MultiBinding>
-              </Image.Source>
-            </Image>
+            <views:SlideImage x:Name="SlideshowImage" Source="{Binding Preview}"
+                              Rect="{Binding Current.Rect}" Angle="{Binding Current.Angle, FallbackValue=0}"
+                              Kind="{Binding Current.Kind, FallbackValue=Crop}" />
           </Border>
         </Viewbox>
         <TextBlock Text="{Binding Position}" Classes="stat" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="20,14" />

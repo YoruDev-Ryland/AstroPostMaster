@@ -6,7 +6,13 @@ namespace AstroPostMaster.App.ViewModels;
 public sealed record AspectOption(AspectRatio Aspect, string Label, string Group)
 {
     public static readonly IReadOnlyList<AspectOption> All =
-        AspectSizes.All.Select(a => new AspectOption(a, AspectSizes.Label(a), AspectSizes.Group(a))).ToList();
+    [
+        .. AspectSizes.All.Select(a => new AspectOption(a, AspectSizes.Label(a), AspectSizes.Group(a))),
+        new(AspectRatio.Custom, "Custom", ""),
+        new(AspectRatio.Free, "Free", ""),
+    ];
+
+    public static int IndexOf(AspectRatio aspect) => All.ToList().FindIndex(o => o.Aspect == aspect);
 
     public override string ToString() => Label;
 }

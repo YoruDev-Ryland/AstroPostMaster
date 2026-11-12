@@ -13,7 +13,9 @@ namespace AstroPostMaster.App.Views;
 
 /// <summary>
 /// The image with every slide's frame drawn over it. Drag inside a frame to move it, drag a corner handle to
-/// resize (ratio locked). The selected frame is the only accent-coloured element; everything outside it is dimmed.
+/// resize (ratio locked unless the post is free, which adds edge handles), drag the knob above the frame to rotate
+/// it (Shift snaps to 5°, double-click resets). The selected frame is the only accent-coloured element; everything
+/// outside it is dimmed.
 /// </summary>
 public sealed class CropCanvas : Control, ICustomHitTest
 {
@@ -23,13 +25,18 @@ public sealed class CropCanvas : Control, ICustomHitTest
     private const double Inset = 16;
     private const double HandleSize = 9;
     private const double HandleHit = 12;
+    private const double RotateOffset = 24;
+    private const double RotateKnob = 5;
 
     private static readonly Cursor MoveCursor = new(StandardCursorType.SizeAll);
     private static readonly Cursor NwseCursor = new(StandardCursorType.TopLeftCorner);
     private static readonly Cursor NeswCursor = new(StandardCursorType.TopRightCorner);
     private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+    private static readonly Cursor NsCursor = new(StandardCursorType.SizeNorthSouth);
+    private static readonly Cursor WeCursor = new(StandardCursorType.SizeWestEast);
+    private static readonly Cursor RotateCursor = new(StandardCursorType.Cross);
 
-    private enum DragMode { None, Move, Resize, Pan }
+    private enum DragMode { None, Move, Resize, Rotate, Pan }
 
     private readonly Viewport _viewport = new();
     private object? _viewportImage;
@@ -40,6 +47,8 @@ public sealed class CropCanvas : Control, ICustomHitTest
     private Point _dragStart;
     private RectF _startRect;
     private Point _anchor; // resize anchor in source pixels
+    private (int X, int Y) _handle; // dragged handle, frame-local −1…1
+    private Size _startSize; // frame size in source pixels when the resize began
 
     static CropCanvas()
     {
@@ -109,9 +118,9 @@ public sealed class CropCanvas : Control, ICustomHitTest
         var muted = new Pen(Brush("FrameBrush", Brushes.Gray), 1);
         foreach (var slide in editor.Slides.Where(s => !s.IsFull && !s.IsSelected))
         {
-            var r = ToCanvas(slide.Rect, image);
-            context.DrawRectangle(null, muted, r);
-            DrawBadge(context, slide.Label, r.TopLeft);
+            var f = Frame.Of(slide, image);
+            using (context.PushTransform(f.Matrix)) context.DrawRectangle(null, muted, f.Local);
+            DrawBadge(context, slide.Label, f.ToCanvas(f.Local.TopLeft));
         }
 
         if (editor.SelectedSlide is not { } selected) return;
@@ -122,27 +131,102 @@ public sealed class CropCanvas : Control, ICustomHitTest
             return;
         }
 
-        var frame = ToCanvas(selected.Rect, image);
+        var frame = Frame.Of(selected, image);
         var dim = Brush("DimBrush", new SolidColorBrush(Color.FromArgb(115, 0, 0, 0)));
-        context.FillRectangle(dim, new Rect(image.Left, image.Top, image.Width, Math.Max(0, frame.Top - image.Top)));
-        context.FillRectangle(dim, new Rect(image.Left, frame.Bottom, image.Width, Math.Max(0, image.Bottom - frame.Bottom)));
-        context.FillRectangle(dim, new Rect(image.Left, frame.Top, Math.Max(0, frame.Left - image.Left), frame.Height));
-        context.FillRectangle(dim, new Rect(frame.Right, frame.Top, Math.Max(0, image.Right - frame.Right), frame.Height));
-
-        if (selected.Panels > 1)
+        var outside = new StreamGeometry();
+        using (var g = outside.Open())
         {
-            var divider = new Pen(accent, 1, new DashStyle([4, 4], 0));
-            foreach (var panel in selected.PanelRects.Skip(1))
+            g.SetFillRule(FillRule.EvenOdd);
+            Polygon(g, [image.TopLeft, image.TopRight, image.BottomRight, image.BottomLeft]);
+            Polygon(g, frame.Corners);
+        }
+        context.DrawGeometry(dim, null, outside);
+
+        var editable = !editor.IsLocked;
+        using (context.PushTransform(frame.Matrix))
+        {
+            var local = frame.Local;
+            if (selected.Panels > 1)
             {
-                var x = image.X + panel.X * image.Width;
-                context.DrawLine(divider, new Point(x, frame.Top), new Point(x, frame.Bottom));
+                var divider = new Pen(accent, 1, new DashStyle([4, 4], 0));
+                for (var i = 1; i < selected.Panels; i++)
+                {
+                    var x = local.Left + i * local.Width / selected.Panels;
+                    context.DrawLine(divider, new Point(x, local.Top), new Point(x, local.Bottom));
+                }
+            }
+
+            context.DrawRectangle(null, new Pen(accent, 2), local);
+            if (editable)
+            {
+                foreach (var (sx, sy) in Handles(editor.IsFreeAspect))
+                {
+                    var c = new Point(sx * local.Width / 2, sy * local.Height / 2);
+                    context.FillRectangle(accent, new Rect(c.X - HandleSize / 2, c.Y - HandleSize / 2, HandleSize, HandleSize));
+                }
+                var top = new Point(0, local.Top);
+                var knob = new Point(0, local.Top - RotateOffset);
+                context.DrawLine(new Pen(accent, 1), top, knob);
+                context.DrawEllipse(Brush("CanvasBrush", Brushes.Black), new Pen(accent, 2), knob, RotateKnob, RotateKnob);
             }
         }
+        DrawBadge(context, selected.Label, frame.ToCanvas(frame.Local.TopLeft));
+        if (_mode == DragMode.Rotate)
+            DrawAngle(context, selected.Angle, frame.Center);
+    }
 
-        context.DrawRectangle(null, new Pen(accent, 2), frame);
-        foreach (var corner in Corners(frame))
-            context.FillRectangle(accent, new Rect(corner.X - HandleSize / 2, corner.Y - HandleSize / 2, HandleSize, HandleSize));
-        DrawBadge(context, selected.Label, frame.TopLeft);
+    private static void Polygon(StreamGeometryContext g, IReadOnlyList<Point> points)
+    {
+        g.BeginFigure(points[0], true);
+        foreach (var p in points.Skip(1)) g.LineTo(p);
+        g.EndFigure(true);
+    }
+
+    private void DrawAngle(DrawingContext context, double angle, Point at)
+    {
+        var text = Text($"{angle.ToString("0.#", CultureInfo.CurrentCulture)}°", 12, Brushes.White);
+        var box = new Rect(at.X - text.Width / 2 - 6, at.Y - text.Height / 2 - 2, text.Width + 12, text.Height + 4);
+        context.FillRectangle(new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)), box, 3);
+        context.DrawText(text, new Point(box.X + 6, box.Y + 2));
+    }
+
+    /// <summary>Handle positions in frame-local units (−1…1): corners, plus edge midpoints for free frames.</summary>
+    private static IEnumerable<(int X, int Y)> Handles(bool free)
+    {
+        (int, int)[] corners = [(-1, -1), (1, -1), (1, 1), (-1, 1)];
+        (int, int)[] edges = [(0, -1), (1, 0), (0, 1), (-1, 0)];
+        return free ? corners.Concat(edges) : corners;
+    }
+
+    /// <summary>A frame on the canvas: centre, unrotated size and angle.</summary>
+    private readonly record struct Frame(Point Center, double Width, double Height, double Angle)
+    {
+        public static Frame Of(SlideViewModel slide, Rect image) => new(
+            new Point(image.X + slide.Rect.CenterX * image.Width, image.Y + slide.Rect.CenterY * image.Height),
+            slide.Rect.W * image.Width, slide.Rect.H * image.Height, slide.Angle);
+
+        public Rect Local => new(-Width / 2, -Height / 2, Width, Height);
+
+        public Matrix Matrix => Matrix.CreateRotation(Angle * Math.PI / 180) * Matrix.CreateTranslation(Center.X, Center.Y);
+
+        public Point ToCanvas(Point local) => local.Transform(Matrix);
+
+        public Point ToLocal(Point canvas)
+        {
+            var (c, s) = (Math.Cos(Angle * Math.PI / 180), Math.Sin(Angle * Math.PI / 180));
+            var (dx, dy) = (canvas.X - Center.X, canvas.Y - Center.Y);
+            return new Point(dx * c + dy * s, -dx * s + dy * c);
+        }
+
+        public bool Contains(Point canvas)
+        {
+            var l = ToLocal(canvas);
+            return Math.Abs(l.X) <= Width / 2 && Math.Abs(l.Y) <= Height / 2;
+        }
+
+        public Point[] Corners => [ToCanvas(Local.TopLeft), ToCanvas(Local.TopRight), ToCanvas(Local.BottomRight), ToCanvas(Local.BottomLeft)];
+
+        public Point RotateKnob => ToCanvas(new Point(0, -Height / 2 - RotateOffset));
     }
 
     private void DrawBadge(DrawingContext context, string label, Point at)
@@ -178,11 +262,6 @@ public sealed class CropCanvas : Control, ICustomHitTest
         e.Handled = true;
     }
 
-    private static Rect ToCanvas(RectF r, Rect image) =>
-        new(image.X + r.X * image.Width, image.Y + r.Y * image.Height, r.W * image.Width, r.H * image.Height);
-
-    private static Point[] Corners(Rect r) => [r.TopLeft, r.TopRight, r.BottomRight, r.BottomLeft];
-
     // ---------- interaction ----------
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -212,18 +291,22 @@ public sealed class CropCanvas : Control, ICustomHitTest
 
         if (editor.SelectedSlide is { IsFull: false } selected && !editor.IsLocked)
         {
-            var corners = Corners(ToCanvas(selected.Rect, image));
-            for (var i = 0; i < corners.Length; i++)
+            var frame = Frame.Of(selected, image);
+            if (Distance(frame.RotateKnob, p) <= HandleHit)
             {
-                if (Distance(corners[i], p) > HandleHit) continue;
-                var opposite = corners[(i + 2) % 4];
-                _anchor = ToSource(opposite, image, editor);
+                if (e.ClickCount == 2) { editor.RotateFrame(selected, 0, selected.Rect); e.Handled = true; return; }
+                Begin(DragMode.Rotate, selected, p, e);
+                return;
+            }
+            if (HandleAt(frame, editor.IsFreeAspect, p) is { } handle)
+            {
+                StartResize(editor, selected, handle);
                 Begin(DragMode.Resize, selected, p, e);
                 return;
             }
         }
 
-        var hit = editor.Slides.Where(s => !s.IsFull && ToCanvas(s.Rect, image).Contains(p))
+        var hit = editor.Slides.Where(s => !s.IsFull && Frame.Of(s, image).Contains(p))
             .OrderByDescending(s => s.IsSelected)
             .FirstOrDefault();
         if (hit is not null)
@@ -239,6 +322,30 @@ public sealed class CropCanvas : Control, ICustomHitTest
         {
             editor.SelectedSlide = full;
         }
+    }
+
+    private static (int X, int Y)? HandleAt(Frame frame, bool free, Point p)
+    {
+        foreach (var (sx, sy) in Handles(free))
+            if (Distance(frame.ToCanvas(new Point(sx * frame.Width / 2, sy * frame.Height / 2)), p) <= HandleHit) return (sx, sy);
+        return null;
+    }
+
+    /// <summary>Remembers the handle and the opposite point, which stays put while resizing (source pixels).</summary>
+    private void StartResize(EditorViewModel editor, SlideViewModel slide, (int X, int Y) handle)
+    {
+        _handle = handle;
+        var (cx, cy) = (slide.Rect.CenterX * editor.SourceWidth, slide.Rect.CenterY * editor.SourceHeight);
+        var (hw, hh) = (slide.Rect.W * editor.SourceWidth / 2, slide.Rect.H * editor.SourceHeight / 2);
+        var (ex, ey) = Axes(slide.Angle);
+        _anchor = new Point(cx - handle.X * hw * ex.X - handle.Y * hh * ey.X, cy - handle.X * hw * ex.Y - handle.Y * hh * ey.Y);
+        _startSize = new Size(hw * 2, hh * 2);
+    }
+
+    private static (Point X, Point Y) Axes(double angle)
+    {
+        var (c, s) = (Math.Cos(angle * Math.PI / 180), Math.Sin(angle * Math.PI / 180));
+        return (new Point(c, s), new Point(-s, c));
     }
 
     private void Begin(DragMode mode, SlideViewModel slide, Point p, PointerPressedEventArgs e)
@@ -273,23 +380,72 @@ public sealed class CropCanvas : Control, ICustomHitTest
             return;
         }
 
-        if (_mode == DragMode.Move)
+        switch (_mode)
         {
-            var dx = (p.X - _dragStart.X) / image.Width;
-            var dy = (p.Y - _dragStart.Y) / image.Height;
-            editor.UpdateFrame(_dragSlide, _startRect with { X = _startRect.X + dx, Y = _startRect.Y + dy });
-            return;
+            case DragMode.Move:
+            {
+                var dx = (p.X - _dragStart.X) / image.Width;
+                var dy = (p.Y - _dragStart.Y) / image.Height;
+                editor.UpdateFrame(_dragSlide, _startRect with { X = _startRect.X + dx, Y = _startRect.Y + dy });
+                break;
+            }
+            case DragMode.Rotate:
+            {
+                var center = new Point(image.X + _startRect.CenterX * image.Width, image.Y + _startRect.CenterY * image.Height);
+                var angle = Math.Atan2(p.Y - center.Y, p.X - center.X) * 180 / Math.PI + 90;
+                angle = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? Math.Round(angle / 5) * 5 : Math.Round(angle, 1);
+                editor.RotateFrame(_dragSlide, angle, _startRect);
+                break;
+            }
+            case DragMode.Resize:
+                Resize(editor, _dragSlide, ToSource(p, image, editor));
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Resizes from the anchor (opposite corner or edge) towards the pointer, in the frame's rotated axes.
+    /// Shrinks the dragged size, keeping the anchor fixed, until the rotated frame fits inside the image.
+    /// </summary>
+    private void Resize(EditorViewModel editor, SlideViewModel slide, Point pointer)
+    {
+        var (ex, ey) = Axes(slide.Angle);
+        var d = pointer - _anchor;
+        var u = d.X * ex.X + d.Y * ex.Y;
+        var v = d.X * ey.X + d.Y * ey.Y;
+        var (su, sv) = (u < 0 ? -1 : 1, v < 0 ? -1 : 1);
+        const double min = SlideGeometry.MinFramePixels;
+        var locked = editor.FrameRatio(slide);
+        var w = _handle.X != 0 ? Math.Max(Math.Abs(u), min) : _startSize.Width;
+        var h = _handle.Y != 0 ? Math.Max(Math.Abs(v), min) : _startSize.Height;
+        if (locked is { } ratio) w = Math.Max(w, h * ratio); // locked frames only have corner handles
+
+        // The frame scaled by t along the dragged axes, placed against the anchor.
+        (double W, double H, Point C) At(double t)
+        {
+            var tw = _handle.X != 0 ? Math.Max(w * t, min) : w;
+            var th = locked is { } r ? tw / r : _handle.Y != 0 ? Math.Max(h * t, min) : h;
+            var ou = _handle.X != 0 ? su * tw / 2 : 0;
+            var ov = _handle.Y != 0 ? sv * th / 2 : 0;
+            return (tw, th, new Point(_anchor.X + ou * ex.X + ov * ey.X, _anchor.Y + ou * ex.Y + ov * ey.Y));
         }
 
-        var ratio = SlideGeometry.FrameRatio(editor.Aspect, _dragSlide.Panels);
-        var pointer = ToSource(p, image, editor);
-        var px = Math.Clamp(pointer.X, 0, editor.SourceWidth);
-        var py = Math.Clamp(pointer.Y, 0, editor.SourceHeight);
-        var w = Math.Max(Math.Abs(px - _anchor.X), Math.Abs(py - _anchor.Y) * ratio);
-        var h = w / ratio;
-        var x = px < _anchor.X ? _anchor.X - w : _anchor.X;
-        var y = py < _anchor.Y ? _anchor.Y - h : _anchor.Y;
-        editor.UpdateFrame(_dragSlide, new RectF(x / editor.SourceWidth, y / editor.SourceHeight, w / editor.SourceWidth, h / editor.SourceHeight));
+        bool Fits((double W, double H, Point C) f) =>
+            SlideGeometry.Inside(f.C.X, f.C.Y, f.W, f.H, slide.Angle, editor.SourceWidth, editor.SourceHeight);
+
+        var frame = At(1);
+        if (!Fits(frame))
+        {
+            double lo = 0, hi = 1;
+            for (var i = 0; i < 24; i++)
+            {
+                var mid = (lo + hi) / 2;
+                if (Fits(At(mid))) lo = mid; else hi = mid;
+            }
+            frame = At(lo);
+        }
+        var (sw, sh) = (editor.SourceWidth, editor.SourceHeight);
+        editor.UpdateFrame(slide, new RectF((frame.C.X - frame.W / 2) / sw, (frame.C.Y - frame.H / 2) / sh, frame.W / sw, frame.H / sh));
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -299,6 +455,7 @@ public sealed class CropCanvas : Control, ICustomHitTest
         _mode = DragMode.None;
         _dragSlide = null;
         e.Pointer.Capture(null);
+        InvalidateVisual();
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
@@ -306,6 +463,7 @@ public sealed class CropCanvas : Control, ICustomHitTest
         base.OnPointerCaptureLost(e);
         _mode = DragMode.None;
         _dragSlide = null;
+        InvalidateVisual();
     }
 
     private Cursor? HoverCursor(EditorViewModel editor, Rect image, Point p)
@@ -314,11 +472,18 @@ public sealed class CropCanvas : Control, ICustomHitTest
         if (editor.IsLocked) return null;
         if (editor.SelectedSlide is { IsFull: false } selected)
         {
-            var corners = Corners(ToCanvas(selected.Rect, image));
-            for (var i = 0; i < corners.Length; i++)
-                if (Distance(corners[i], p) <= HandleHit) return i % 2 == 0 ? NwseCursor : NeswCursor;
+            var frame = Frame.Of(selected, image);
+            if (Distance(frame.RotateKnob, p) <= HandleHit) return RotateCursor;
+            if (HandleAt(frame, editor.IsFreeAspect, p) is { } h)
+                return (h.X, h.Y) switch
+                {
+                    (0, _) => NsCursor,
+                    (_, 0) => WeCursor,
+                    _ when h.X == h.Y => NwseCursor,
+                    _ => NeswCursor,
+                };
         }
-        return editor.Slides.Any(s => !s.IsFull && ToCanvas(s.Rect, image).Contains(p)) ? MoveCursor : null;
+        return editor.Slides.Any(s => !s.IsFull && Frame.Of(s, image).Contains(p)) ? MoveCursor : null;
     }
 
     private static Point ToSource(Point canvas, Rect image, EditorViewModel editor) =>

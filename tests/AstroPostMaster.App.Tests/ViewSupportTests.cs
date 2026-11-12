@@ -25,8 +25,8 @@ public class ViewSupportTests
         editor.AspectIndex = 3;
 
         Assert.Equal(AspectRatio.Square, editor.Aspect);
-        Assert.Equal(new[] { "4:5", "3:4", "2:3", "1:1", "4:3", "3:2", "16:9", "1.91:1" }, EditorViewModel.AspectOptions.Select(o => o.Label));
-        Assert.Equal(new[] { "Portrait", "Portrait", "Portrait", "Square", "Landscape", "Landscape", "Landscape", "Landscape" },
+        Assert.Equal(new[] { "4:5", "3:4", "2:3", "1:1", "4:3", "3:2", "16:9", "1.91:1", "Custom", "Free" }, EditorViewModel.AspectOptions.Select(o => o.Label));
+        Assert.Equal(new[] { "Portrait", "Portrait", "Portrait", "Square", "Landscape", "Landscape", "Landscape", "Landscape", "", "" },
             EditorViewModel.AspectOptions.Select(o => o.Group));
     }
 
